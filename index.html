@@ -10,6 +10,22 @@
     table { width: 100%; border-collapse: collapse; margin-top: 1em; }
     th, td { padding: 0.5em; border: 1px solid #ccc; text-align: left; }
     tr:nth-child(even) { background: #f9f9f9; }
+    .cor { width: 100px; text-align: center; font-weight: bold; color: #fff; }
+    .rcm-1 { background: #ffffb2; color: #000; }
+    .rcm-2 { background: #fecc5c; color: #000; }
+    .rcm-3 { background: #fd8d3c; }
+    .rcm-4 { background: #f03b20; }
+    .rcm-5 { background: #bd0026; }
+    .legenda { margin-top: 2em; }
+    .legenda-item { display: flex; align-items: center; margin-bottom: 0.5em; }
+    .legenda-box {
+      width: 20px; height: 20px; margin-right: 0.5em; border: 1px solid #ccc;
+    }
+    .rcm-1 .legenda-box { background: #ffffb2; }
+    .rcm-2 .legenda-box { background: #fecc5c; }
+    .rcm-3 .legenda-box { background: #fd8d3c; }
+    .rcm-4 .legenda-box { background: #f03b20; }
+    .rcm-5 .legenda-box { background: #bd0026; }
   </style>
 </head>
 <body>
@@ -20,7 +36,7 @@
         <th>DICO</th>
         <th>Latitude</th>
         <th>Longitude</th>
-        <th>Risco (rcm)</th>
+        <th>Risco</th>
       </tr>
     </thead>
     <tbody id="tabela">
@@ -28,22 +44,34 @@
     </tbody>
   </table>
 
+  <div class="legenda">
+    <h3>Legenda de Risco</h3>
+    <div class="legenda-item rcm-1"><div class="legenda-box"></div>Baixo</div>
+    <div class="legenda-item rcm-2"><div class="legenda-box"></div>Moderado</div>
+    <div class="legenda-item rcm-3"><div class="legenda-box"></div>Elevado</div>
+    <div class="legenda-item rcm-4"><div class="legenda-box"></div>Muito Elevado</div>
+    <div class="legenda-item rcm-5"><div class="legenda-box"></div>Máximo</div>
+  </div>
+
   <script>
     fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json')
       .then(res => res.json())
       .then(json => {
         const tbody = document.getElementById('tabela');
-        tbody.innerHTML = ''; // limpar linha de "A carregar..."
+        tbody.innerHTML = '';
 
         const locais = json.local;
         for (const id in locais) {
           const { dico, latitude, longitude, data } = locais[id];
+          const rcm = data.rcm;
+          const riscoNome = ['Baixo','Moderado','Elevado','Muito Elevado','Máximo'][rcm - 1] || '—';
+
           const linha = document.createElement('tr');
           linha.innerHTML = `
             <td>${dico}</td>
             <td>${latitude}</td>
             <td>${longitude}</td>
-            <td>${data.rcm}</td>
+            <td class="cor rcm-${rcm}">${riscoNome}</td>
           `;
           tbody.appendChild(linha);
         }
