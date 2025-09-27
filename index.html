@@ -7,6 +7,7 @@
   <style>
     body { font-family: sans-serif; padding: 1em; }
     h2 { text-align: center; }
+    label, select { font-size: 1em; margin-right: 0.5em; }
     table { width: 100%; border-collapse: collapse; margin-top: 1em; }
     th, td { padding: 0.5em; border: 1px solid #ccc; text-align: center; }
     tr:nth-child(even) { background: #f9f9f9; }
@@ -31,6 +32,17 @@
 </head>
 <body>
   <h2>Risco de Incêndio</h2>
+
+  <label for="filtro">Filtrar por risco:</label>
+  <select id="filtro">
+    <option value="0">Todos</option>
+    <option value="1">Reduzido</option>
+    <option value="2">Moderado</option>
+    <option value="3">Elevado</option>
+    <option value="4">Muito Elevado</option>
+    <option value="5">Máximo</option>
+  </select>
+
   <table>
     <thead>
       <tr>
@@ -66,15 +78,43 @@
       5: 'Máximo'
     };
 
+    let dados = [];
+
+    document.getElementById('filtro').addEventListener('change', () => {
+      const nivel = parseInt(document.getElementById('filtro').value);
+      renderTabela(nivel);
+    });
+
+    function renderTabela(filtro) {
+      const tbody = document.getElementById('tabela');
+      tbody.innerHTML = '';
+
+      for (const linha of dados) {
+        const { lat, lon, rcmHoje, rcmAmanha, nomeConcelho } = linha;
+        if (filtro > 0 && rcmHoje !== filtro && rcmAmanha !== filtro) continue;
+
+        const nomeHoje = nomes[rcmHoje] || '—';
+        const nomeAmanha = nomes[rcmAmanha] || '—';
+        const aumento = rcmAmanha > rcmHoje ? 'aumento' : '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${nomeConcelho}</td>
+          <td>${lat}</td>
+          <td>${lon}</td>
+          <td class="cor rcm-${rcmHoje}">${nomeHoje}</td>
+          <td class="cor rcm-${rcmAmanha} ${aumento}">${nomeAmanha}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
     Promise.all([
       fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json').then(r => r.json()),
       fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json').then(r => r.json()),
       fetch('concelhos.json').then(r => r.json())
     ])
     .then(([hoje, amanha, mapaConcelhos]) => {
-      const tbody = document.getElementById('tabela');
-      tbody.innerHTML = '';
-
       const locaisHoje = hoje.local;
       const locaisAmanha = amanha.local;
 
@@ -83,25 +123,16 @@
         const a = locaisAmanha[id];
         if (!h || !a) continue;
 
-        const rcmHoje = h.data.rcm;
-        const rcmAmanha = a.data.rcm;
-
-        const nomeHoje = nomes[rcmHoje] || '—';
-        const nomeAmanha = nomes[rcmAmanha] || '—';
-        const nomeConcelho = mapaConcelhos[id] || id;
-
-        const aumento = rcmAmanha > rcmHoje ? 'aumento' : '';
-
-        const linha = document.createElement('tr');
-        linha.innerHTML = `
-          <td>${nomeConcelho}</td>
-          <td>${h.latitude}</td>
-          <td>${h.longitude}</td>
-          <td class="cor rcm-${rcmHoje}">${nomeHoje}</td>
-          <td class="cor rcm-${rcmAmanha} ${aumento}">${nomeAmanha}</td>
-        `;
-        tbody.appendChild(linha);
+        dados.push({
+          lat: h.latitude,
+          lon: h.longitude,
+          rcmHoje: h.data.rcm,
+          rcmAmanha: a.data.rcm,
+          nomeConcelho: mapaConcelhos[id] || id
+        });
       }
+
+      renderTabela(0); // mostra tudo por defeito
     })
     .catch(error => {
       const tbody = document.getElementById('tabela');
