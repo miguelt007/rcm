@@ -6,12 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    #map { height: 90vh; }
-    body { font-family: sans-serif; margin: 0; }
+    #map { height: 95vh; }
+    body { margin: 0; font-family: sans-serif; }
+    h2 { text-align: center; margin: 0.5em 0; }
   </style>
 </head>
 <body>
-  <h2 style="text-align:center;">Risco de Incêndio</h2>
+  <h2>Risco de Incêndio</h2>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -21,41 +22,48 @@
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    const urls = {
-      hoje: 'https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json',
-      amanha: 'https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json',
-      locais: 'https://api.ipma.pt/open-data/distrits-islands.json'
-    };
+    // Função para cor conforme risco
+    function getColor(rcm) {
+      return {
+        1: '#ffffb2', // Baixo
+        2: '#fecc5c', // Moderado
+        3: '#fd8d3c', // Elevado
+        4: '#f03b20', // Muito Elevado
+        5: '#bd0026'  // Máximo
+      }[rcm] || '#ccc'; // Sem dados
+    }
 
-    Promise.all([
-      fetch(urls.hoje).then(res => res.json()),
-      fetch(urls.amanha).then(res => res.json()),
-      fetch(urls.locais).then(res => res.json())
-    ])
-    .then(([hoje, amanha, locais]) => {
-      const locaisMap = {};
-      locais.data.forEach(loc => {
-        locaisMap[loc.globalIdLocal] = loc;
+    // Carregar GeoJSON simplificado dos concelhos
+    fetch('https://raw.githubusercontent.com/dgterritorio/caop/main/caop2023-simplificado.json')
+      .then(res => res.json())
+      .then(caop => {
+        // Carregar risco IPMA
+        fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json')
+          .then(res => res.json())
+          .then(risco => {
+            const riscoMap = {};
+            risco.data.forEach(r => riscoMap[r.idConcelho] = r.rcm);
+
+            // Pintar concelhos
+            L.geoJSON(caop, {
+              style: feature => {
+                const rcm = riscoMap[feature.properties.DICOFRE];
+                return {
+                  fillColor: getColor(rcm),
+                  weight: 1,
+                  color: '#666',
+                  fillOpacity: 0.7
+                };
+              },
+              onEachFeature: (feature, layer) => {
+                const nome = feature.properties.NOME;
+                const rcm = riscoMap[feature.properties.DICOFRE];
+                const legenda = ['Baixo','Moderado','Elevado','Muito Elevado','Máximo'][rcm - 1] || 'Sem dados';
+                layer.bindPopup(`<strong>${nome}</strong><br>Risco: ${legenda} (${rcm ?? '—'})`);
+              }
+            }).addTo(map);
+          });
       });
-
-      hoje.data.forEach(entry => {
-        const meta = locaisMap[entry.globalIdLocal];
-        if (!meta || !meta.latitude || !meta.longitude) return;
-
-        const amanhaEntry = amanha.data.find(e => e.globalIdLocal === entry.globalIdLocal);
-        const popup = `
-          <strong>${meta.local}</strong><br>
-          Hoje: ${entry.rcm} (${entry.tMin}°C - ${entry.tMax}°C)<br>
-          Amanhã: ${amanhaEntry?.rcm ?? '—'} (${amanhaEntry?.tMin ?? '—'}°C - ${amanhaEntry?.tMax ?? '—'}°C)
-        `;
-        L.circleMarker([meta.latitude, meta.longitude], {
-          radius: 6,
-          color: 'red',
-          fillColor: 'orange',
-          fillOpacity: 0.6
-        }).addTo(map).bindPopup(popup);
-      });
-    });
   </script>
 </body>
 </html>
