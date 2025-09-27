@@ -30,21 +30,23 @@
 
   <script>
     fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json')
-      .then(response => response.json())
+      .then(res => res.json())
       .then(json => {
         const tbody = document.getElementById('tabela');
         tbody.innerHTML = ''; // limpar linha de "A carregar..."
 
-        json.data.forEach(entry => {
+        const locais = json.local;
+        for (const id in locais) {
+          const { dico, latitude, longitude, data } = locais[id];
           const linha = document.createElement('tr');
           linha.innerHTML = `
-            <td>${entry.DICO}</td>
-            <td>${entry.latitude}</td>
-            <td>${entry.longitude}</td>
-            <td>${entry.rcm}</td>
+            <td>${dico}</td>
+            <td>${latitude}</td>
+            <td>${longitude}</td>
+            <td>${data.rcm}</td>
           `;
           tbody.appendChild(linha);
-        });
+        }
       })
       .catch(error => {
         const tbody = document.getElementById('tabela');
