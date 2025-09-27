@@ -32,32 +32,24 @@
       }[rcm] || '#ccc';
     }
 
-    Promise.all([
-      fetch('https://raw.githubusercontent.com/joaopalmeiro/caop-geojson/main/caop-simplificado.json').then(r => r.json()),
-      fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json').then(r => r.json())
-    ])
-    .then(([caop, risco]) => {
-      const riscoMap = {};
-      risco.data.forEach(r => riscoMap[r.idConcelho] = r.rcm);
+    fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json')
+      .then(res => res.json())
+      .then(data => {
+        data.data.forEach(entry => {
+          const { DICO, rcm, latitude, longitude } = entry;
+          if (!latitude || !longitude) return;
 
-      L.geoJSON(caop, {
-        style: feature => {
-          const rcm = riscoMap[feature.properties.DICOFRE];
-          return {
-            fillColor: getColor(rcm),
-            weight: 1,
-            color: '#666',
-            fillOpacity: 0.7
-          };
-        },
-        onEachFeature: (feature, layer) => {
-          const nome = feature.properties.NOME;
-          const rcm = riscoMap[feature.properties.DICOFRE];
           const legenda = ['Baixo','Moderado','Elevado','Muito Elevado','Máximo'][rcm - 1] || 'Sem dados';
-          layer.bindPopup(`<strong>${nome}</strong><br>Risco: ${legenda} (${rcm ?? '—'})`);
-        }
-      }).addTo(map);
-    });
+          const popup = `<strong>Concelho ${DICO}</strong><br>Risco: ${legenda} (${rcm})`;
+
+          L.circleMarker([latitude, longitude], {
+            radius: 6,
+            color: getColor(rcm),
+            fillColor: getColor(rcm),
+            fillOpacity: 0.7
+          }).addTo(map).bindPopup(popup);
+        });
+      });
   </script>
 </body>
 </html>
