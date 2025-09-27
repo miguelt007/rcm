@@ -37,9 +37,8 @@
   <h2>Dashboard de Risco</h2>
 
   <!-- Filtro por risco -->
-  <label for="filtroRisco">Risco:</label>
   <select id="filtroRisco" onchange="filtrarTabela()">
-    <option value="">Todos</option>
+    <option value="">Todos os riscos</option>
     <option value="Muito Elevado">Muito Elevado</option>
     <option value="Elevado">Elevado</option>
     <option value="Moderado">Moderado</option>
@@ -47,7 +46,7 @@
   </select>
 
   <!-- Filtro por nome de concelho -->
-  <input type="text" id="filtroConcelho" placeholder="Filtrar concelho..." oninput="filtrarTabela()" />
+  <input type="text" id="filtroConcelho" placeholder="Filtrar por concelho..." oninput="filtrarTabela()" />
 
   <!-- Tabela de concelhos -->
   <table id="tabelaRisco">
@@ -58,43 +57,26 @@
       </tr>
     </thead>
     <tbody>
-      <tr>
-        <td>Lisboa</td>
-        <td>Moderado</td>
-      </tr>
-      <tr>
-        <td>Loures</td>
-        <td>Elevado</td>
-      </tr>
-      <tr>
-        <td>Torres Vedras</td>
-        <td>Muito Elevado</td>
-      </tr>
-      <tr>
-        <td>Sobral de Monte Agraço</td>
-        <td>Reduzido</td>
-      </tr>
-      <tr>
-        <td>Vila Franca de Xira</td>
-        <td>Elevado</td>
-      </tr>
+      <tr><td>Lisboa</td><td>Moderado</td></tr>
+      <tr><td>Loures</td><td>Elevado</td></tr>
+      <tr><td>Torres Vedras</td><td>Muito Elevado</td></tr>
+      <tr><td>Sobral de Monte Agraço</td><td>Reduzido</td></tr>
+      <tr><td>Vila Franca de Xira</td><td>Elevado</td></tr>
     </tbody>
   </table>
 
   <script>
     function filtrarTabela() {
-      const riscoSelecionado = document.getElementById("filtroRisco").value.toLowerCase();
-      const termoConcelho = document.getElementById("filtroConcelho").value.toLowerCase();
+      const risco = document.getElementById("filtroRisco").value.toLowerCase();
+      const concelho = document.getElementById("filtroConcelho").value.toLowerCase();
       const linhas = document.querySelectorAll("#tabelaRisco tbody tr");
 
       linhas.forEach(linha => {
-        const concelho = linha.cells[0].textContent.toLowerCase();
-        const risco = linha.cells[1].textContent.toLowerCase();
+        const nome = linha.cells[0].textContent.toLowerCase();
+        const nivel = linha.cells[1].textContent.toLowerCase();
 
-        const correspondeRisco = !riscoSelecionado || risco === riscoSelecionado;
-        const correspondeConcelho = concelho.includes(termoConcelho);
-
-        linha.classList.toggle("hidden", !(correspondeRisco && correspondeConcelho));
+        const mostra = (!risco || nivel === risco) && nome.includes(concelho);
+        linha.classList.toggle("hidden", !mostra);
       });
     }
   </script>
