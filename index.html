@@ -27,7 +27,6 @@
       border: 1px solid #ccc;
       border-radius: 6px;
       font-size: 0.95em;
-      color: #222;
     }
     .legenda-item {
       display: flex;
@@ -40,11 +39,20 @@
       margin-right: 0.5em;
       border: 1px solid #ccc;
     }
-    .rcm-1 .legenda-box { background: #509e2f; }
-    .rcm-2 .legenda-box { background: #ffe900; }
-    .rcm-3 .legenda-box { background: #e87722; }
-    .rcm-4 .legenda-box { background: #cb333b; }
-    .rcm-5 .legenda-box { background: #6f263d; }
+    .rcm-1 .legenda-box { background: #509e2f; color: #222; }
+    .rcm-2 .legenda-box { background: #ffe900; color: #222; }
+    .rcm-3 .legenda-box { background: #e87722; color: #fff; }
+    .rcm-4 .legenda-box { background: #cb333b; color: #fff; }
+    .rcm-5 .legenda-box { background: #6f263d; color: #fff; }
+    .legenda-item.rcm-3,
+    .legenda-item.rcm-4,
+    .legenda-item.rcm-5 {
+      color: #fff;
+    }
+    .legenda-item.rcm-1,
+    .legenda-item.rcm-2 {
+      color: #222;
+    }
   </style>
 </head>
 <body>
