@@ -7,16 +7,16 @@
   <style>
     body { font-family: sans-serif; padding: 1em; }
     h2 { text-align: center; }
-    label, select { font-size: 1em; margin-right: 0.5em; }
+    label, select, input { font-size: 1em; margin-right: 0.5em; margin-bottom: 0.5em; }
     table { width: 100%; border-collapse: collapse; margin-top: 1em; }
     th, td { padding: 0.5em; border: 1px solid #ccc; text-align: center; }
     tr:nth-child(even) { background: #f9f9f9; }
     .cor { font-weight: bold; color: #fff; }
-    .rcm-1 { background: #509e2f; }     /* Reduzido */
-    .rcm-2 { background: #ffe900; color: #000; } /* Moderado */
-    .rcm-3 { background: #e87722; }     /* Elevado */
-    .rcm-4 { background: #cb333b; }     /* Muito Elevado */
-    .rcm-5 { background: #6f263d; }     /* Máximo */
+    .rcm-1 { background: #509e2f; }
+    .rcm-2 { background: #ffe900; color: #000; }
+    .rcm-3 { background: #e87722; }
+    .rcm-4 { background: #cb333b; }
+    .rcm-5 { background: #6f263d; }
     .aumento::after { content: " 🔺"; }
 
     .legenda {
@@ -46,15 +46,9 @@
     .rcm-5 .legenda-box { background: #6f263d; color: #fff; }
     .legenda-item.rcm-3,
     .legenda-item.rcm-4,
-    .legenda-item.rcm-5 {
-      color: #fff;
-    }
-    .legenda-item.rcm-1 {
-  color: #fff;
-}
-.legenda-item.rcm-2 {
-  color: #222;
-}
+    .legenda-item.rcm-5 { color: #fff; }
+    .legenda-item.rcm-1 { color: #fff; }
+    .legenda-item.rcm-2 { color: #222; }
   </style>
 </head>
 <body>
@@ -69,6 +63,9 @@
     <option value="4">Muito Elevado</option>
     <option value="5">Máximo</option>
   </select>
+
+  <label for="filtroConcelho">Filtrar por concelho:</label>
+  <input type="text" id="filtroConcelho" placeholder="Escreve o nome..." />
 
   <table>
     <thead>
@@ -112,13 +109,21 @@
       renderTabela(nivel);
     });
 
+    document.getElementById('filtroConcelho').addEventListener('input', () => {
+      const nivel = parseInt(document.getElementById('filtro').value);
+      renderTabela(nivel);
+    });
+
     function renderTabela(filtro) {
       const tbody = document.getElementById('tabela');
+      const termoConcelho = document.getElementById('filtroConcelho').value.toLowerCase();
       tbody.innerHTML = '';
 
       for (const linha of dados) {
         const { lat, lon, rcmHoje, rcmAmanha, nomeConcelho } = linha;
+
         if (filtro > 0 && rcmHoje !== filtro && rcmAmanha !== filtro) continue;
+        if (termoConcelho && !nomeConcelho.toLowerCase().includes(termoConcelho)) continue;
 
         const nomeHoje = nomes[rcmHoje] || '—';
         const nomeAmanha = nomes[rcmAmanha] || '—';
@@ -159,7 +164,7 @@
         });
       }
 
-      renderTabela(0); // mostra tudo por defeito
+      renderTabela(0);
     })
     .catch(error => {
       const tbody = document.getElementById('tabela');
