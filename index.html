@@ -8,44 +8,93 @@
       font-family: sans-serif;
       margin: 20px;
     }
-    #filtroConcelho {
+    input, select {
       padding: 8px;
       font-size: 16px;
-      width: 300px;
+      margin-right: 10px;
       margin-bottom: 12px;
     }
-    .concelho {
-      margin: 4px 0;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    tr.hidden {
+      display: none;
     }
   </style>
 </head>
 <body>
 
-  <h2>Filtrar por concelho</h2>
-  <input type="text" id="filtroConcelho" placeholder="Escreve o nome do concelho..." oninput="filtrarPorNome()" />
+  <h2>Dashboard de Risco</h2>
 
-  <div id="listaConcelhos">
-    <div class="concelho">Lisboa</div>
-    <div class="concelho">Loures</div>
-    <div class="concelho">Torres Vedras</div>
-    <div class="concelho">Sobral de Monte Agraço</div>
-    <div class="concelho">Vila Franca de Xira</div>
-    <div class="concelho">Odivelas</div>
-    <div class="concelho">Amadora</div>
-    <div class="concelho">Sintra</div>
-    <div class="concelho">Cascais</div>
-    <div class="concelho">Oeiras</div>
-    <!-- Podes adicionar os restantes aqui -->
-  </div>
+  <!-- Filtro por risco -->
+  <label for="filtroRisco">Risco:</label>
+  <select id="filtroRisco" onchange="filtrarTabela()">
+    <option value="">Todos</option>
+    <option value="Muito Elevado">Muito Elevado</option>
+    <option value="Elevado">Elevado</option>
+    <option value="Moderado">Moderado</option>
+    <option value="Reduzido">Reduzido</option>
+  </select>
+
+  <!-- Filtro por nome de concelho -->
+  <input type="text" id="filtroConcelho" placeholder="Filtrar concelho..." oninput="filtrarTabela()" />
+
+  <!-- Tabela de concelhos -->
+  <table id="tabelaRisco">
+    <thead>
+      <tr>
+        <th>Concelho</th>
+        <th>Risco</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Lisboa</td>
+        <td>Moderado</td>
+      </tr>
+      <tr>
+        <td>Loures</td>
+        <td>Elevado</td>
+      </tr>
+      <tr>
+        <td>Torres Vedras</td>
+        <td>Muito Elevado</td>
+      </tr>
+      <tr>
+        <td>Sobral de Monte Agraço</td>
+        <td>Reduzido</td>
+      </tr>
+      <tr>
+        <td>Vila Franca de Xira</td>
+        <td>Elevado</td>
+      </tr>
+    </tbody>
+  </table>
 
   <script>
-    function filtrarPorNome() {
-      const termo = document.getElementById("filtroConcelho").value.toLowerCase();
-      const concelhos = document.querySelectorAll(".concelho");
+    function filtrarTabela() {
+      const riscoSelecionado = document.getElementById("filtroRisco").value.toLowerCase();
+      const termoConcelho = document.getElementById("filtroConcelho").value.toLowerCase();
+      const linhas = document.querySelectorAll("#tabelaRisco tbody tr");
 
-      concelhos.forEach(el => {
-        const nome = el.textContent.toLowerCase();
-        el.style.display = nome.includes(termo) ? "block" : "none";
+      linhas.forEach(linha => {
+        const concelho = linha.cells[0].textContent.toLowerCase();
+        const risco = linha.cells[1].textContent.toLowerCase();
+
+        const correspondeRisco = !riscoSelecionado || risco === riscoSelecionado;
+        const correspondeConcelho = concelho.includes(termoConcelho);
+
+        linha.classList.toggle("hidden", !(correspondeRisco && correspondeConcelho));
       });
     }
   </script>
