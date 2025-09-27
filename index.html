@@ -12,14 +12,10 @@
       padding: 8px;
       font-size: 16px;
       width: 300px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
-    ul {
-      list-style: none;
-      padding: 0;
-    }
-    li {
-      padding: 6px 0;
+    .concelho {
+      margin: 4px 0;
     }
   </style>
 </head>
@@ -28,28 +24,28 @@
   <h2>Filtrar por concelho</h2>
   <input type="text" id="filtroConcelho" placeholder="Escreve o nome do concelho..." oninput="filtrarPorNome()" />
 
-  <ul id="listaConcelhos">
-    <li>Lisboa</li>
-    <li>Loures</li>
-    <li>Torres Vedras</li>
-    <li>Sobral de Monte Agraço</li>
-    <li>Vila Franca de Xira</li>
-    <li>Odivelas</li>
-    <li>Amadora</li>
-    <li>Sintra</li>
-    <li>Cascais</li>
-    <li>Oeiras</li>
-    <!-- Adiciona os restantes -->
-  </ul>
+  <div id="listaConcelhos">
+    <div class="concelho">Lisboa</div>
+    <div class="concelho">Loures</div>
+    <div class="concelho">Torres Vedras</div>
+    <div class="concelho">Sobral de Monte Agraço</div>
+    <div class="concelho">Vila Franca de Xira</div>
+    <div class="concelho">Odivelas</div>
+    <div class="concelho">Amadora</div>
+    <div class="concelho">Sintra</div>
+    <div class="concelho">Cascais</div>
+    <div class="concelho">Oeiras</div>
+    <!-- Podes adicionar os restantes aqui -->
+  </div>
 
   <script>
     function filtrarPorNome() {
       const termo = document.getElementById("filtroConcelho").value.toLowerCase();
-      const itens = document.querySelectorAll("#listaConcelhos li");
+      const concelhos = document.querySelectorAll(".concelho");
 
-      itens.forEach(item => {
-        const nome = item.textContent.toLowerCase();
-        item.style.display = nome.includes(termo) ? "" : "none";
+      concelhos.forEach(el => {
+        const nome = el.textContent.toLowerCase();
+        el.style.display = nome.includes(termo) ? "block" : "none";
       });
     }
   </script>
