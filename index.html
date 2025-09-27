@@ -11,21 +11,21 @@
     th, td { padding: 0.5em; border: 1px solid #ccc; text-align: center; }
     tr:nth-child(even) { background: #f9f9f9; }
     .cor { font-weight: bold; color: #fff; }
-    .rcm-1 { background: #ffffb2; color: #000; }
-    .rcm-2 { background: #fecc5c; color: #000; }
-    .rcm-3 { background: #fd8d3c; }
-    .rcm-4 { background: #f03b20; }
-    .rcm-5 { background: #bd0026; }
+    .rcm-1 { background: #509e2f; }     /* Reduzido */
+    .rcm-2 { background: #ffe900; color: #000; } /* Moderado */
+    .rcm-3 { background: #e87722; }     /* Elevado */
+    .rcm-4 { background: #cb333b; }     /* Muito Elevado */
+    .rcm-5 { background: #6f263d; }     /* Máximo */
     .legenda { margin-top: 2em; }
     .legenda-item { display: flex; align-items: center; margin-bottom: 0.5em; }
     .legenda-box {
       width: 20px; height: 20px; margin-right: 0.5em; border: 1px solid #ccc;
     }
-    .rcm-1 .legenda-box { background: #ffffb2; }
-    .rcm-2 .legenda-box { background: #fecc5c; }
-    .rcm-3 .legenda-box { background: #fd8d3c; }
-    .rcm-4 .legenda-box { background: #f03b20; }
-    .rcm-5 .legenda-box { background: #bd0026; }
+    .rcm-1 .legenda-box { background: #509e2f; }
+    .rcm-2 .legenda-box { background: #ffe900; }
+    .rcm-3 .legenda-box { background: #e87722; }
+    .rcm-4 .legenda-box { background: #cb333b; }
+    .rcm-5 .legenda-box { background: #6f263d; }
   </style>
 </head>
 <body>
@@ -49,16 +49,16 @@
 
   <div class="legenda">
     <h3>Legenda de Risco</h3>
-    <div class="legenda-item rcm-1"><div class="legenda-box"></div>Baixo</div>
-    <div class="legenda-item rcm-2"><div class="legenda-box"></div>Moderado</div>
-    <div class="legenda-item rcm-3"><div class="legenda-box"></div>Elevado</div>
-    <div class="legenda-item rcm-4"><div class="legenda-box"></div>Muito Elevado</div>
     <div class="legenda-item rcm-5"><div class="legenda-box"></div>Máximo</div>
+    <div class="legenda-item rcm-4"><div class="legenda-box"></div>Muito Elevado</div>
+    <div class="legenda-item rcm-3"><div class="legenda-box"></div>Elevado</div>
+    <div class="legenda-item rcm-2"><div class="legenda-box"></div>Moderado</div>
+    <div class="legenda-item rcm-1"><div class="legenda-box"></div>Reduzido</div>
   </div>
 
   <script>
     const nomes = {
-      1: 'Baixo',
+      1: 'Reduzido',
       2: 'Moderado',
       3: 'Elevado',
       4: 'Muito Elevado',
