@@ -33,7 +33,7 @@
   <table>
     <thead>
       <tr>
-        <th>DICO</th>
+        <th>Concelho</th>
         <th>Latitude</th>
         <th>Longitude</th>
         <th colspan="2">rcm</th>
@@ -67,9 +67,10 @@
 
     Promise.all([
       fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json').then(r => r.json()),
-      fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json').then(r => r.json())
+      fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json').then(r => r.json()),
+      fetch('concelhos.json').then(r => r.json())
     ])
-    .then(([hoje, amanha]) => {
+    .then(([hoje, amanha, mapaConcelhos]) => {
       const tbody = document.getElementById('tabela');
       tbody.innerHTML = '';
 
@@ -86,10 +87,11 @@
 
         const nomeHoje = nomes[rcmHoje] || '—';
         const nomeAmanha = nomes[rcmAmanha] || '—';
+        const nomeConcelho = mapaConcelhos[id] || id;
 
         const linha = document.createElement('tr');
         linha.innerHTML = `
-          <td>${id}</td>
+          <td>${nomeConcelho}</td>
           <td>${h.latitude}</td>
           <td>${h.longitude}</td>
           <td class="cor rcm-${rcmHoje}">${nomeHoje}</td>
