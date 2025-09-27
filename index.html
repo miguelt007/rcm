@@ -16,6 +16,7 @@
     .rcm-3 { background: #e87722; }     /* Elevado */
     .rcm-4 { background: #cb333b; }     /* Muito Elevado */
     .rcm-5 { background: #6f263d; }     /* Máximo */
+    .aumento::after { content: " 🔺"; }
     .legenda { margin-top: 2em; }
     .legenda-item { display: flex; align-items: center; margin-bottom: 0.5em; }
     .legenda-box {
@@ -89,13 +90,15 @@
         const nomeAmanha = nomes[rcmAmanha] || '—';
         const nomeConcelho = mapaConcelhos[id] || id;
 
+        const aumento = rcmAmanha > rcmHoje ? 'aumento' : '';
+
         const linha = document.createElement('tr');
         linha.innerHTML = `
           <td>${nomeConcelho}</td>
           <td>${h.latitude}</td>
           <td>${h.longitude}</td>
           <td class="cor rcm-${rcmHoje}">${nomeHoje}</td>
-          <td class="cor rcm-${rcmAmanha}">${nomeAmanha}</td>
+          <td class="cor rcm-${rcmAmanha} ${aumento}">${nomeAmanha}</td>
         `;
         tbody.appendChild(linha);
       }
