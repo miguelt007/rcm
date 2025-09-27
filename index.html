@@ -18,10 +18,27 @@
     .rcm-4 { background: #cb333b; }     /* Muito Elevado */
     .rcm-5 { background: #6f263d; }     /* Máximo */
     .aumento::after { content: " 🔺"; }
-    .legenda { margin-top: 2em; }
-    .legenda-item { display: flex; align-items: center; margin-bottom: 0.5em; }
+
+    .legenda {
+      margin-top: 2em;
+      max-width: 300px;
+      padding: 0.5em;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.95em;
+      color: #222;
+    }
+    .legenda-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.5em;
+    }
     .legenda-box {
-      width: 20px; height: 20px; margin-right: 0.5em; border: 1px solid #ccc;
+      width: 20px;
+      height: 20px;
+      margin-right: 0.5em;
+      border: 1px solid #ccc;
     }
     .rcm-1 .legenda-box { background: #509e2f; }
     .rcm-2 .legenda-box { background: #ffe900; }
