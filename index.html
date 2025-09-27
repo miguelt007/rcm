@@ -8,9 +8,9 @@
     body { font-family: sans-serif; padding: 1em; }
     h2 { text-align: center; }
     table { width: 100%; border-collapse: collapse; margin-top: 1em; }
-    th, td { padding: 0.5em; border: 1px solid #ccc; text-align: left; }
+    th, td { padding: 0.5em; border: 1px solid #ccc; text-align: center; }
     tr:nth-child(even) { background: #f9f9f9; }
-    .cor { width: 100px; text-align: center; font-weight: bold; color: #fff; }
+    .cor { font-weight: bold; color: #fff; }
     .rcm-1 { background: #ffffb2; color: #000; }
     .rcm-2 { background: #fecc5c; color: #000; }
     .rcm-3 { background: #fd8d3c; }
@@ -36,11 +36,14 @@
         <th>DICO</th>
         <th>Latitude</th>
         <th>Longitude</th>
-        <th>Risco</th>
+        <th colspan="2">rcm</th>
+      </tr>
+      <tr>
+        <th></th><th></th><th></th><th>Hoje</th><th>Amanhã</th>
       </tr>
     </thead>
     <tbody id="tabela">
-      <tr><td colspan="4">A carregar dados...</td></tr>
+      <tr><td colspan="5">A carregar dados...</td></tr>
     </tbody>
   </table>
 
@@ -54,32 +57,40 @@
   </div>
 
   <script>
-    fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json')
-      .then(res => res.json())
-      .then(json => {
-        const tbody = document.getElementById('tabela');
-        tbody.innerHTML = '';
+    Promise.all([
+      fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json').then(r => r.json()),
+      fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json').then(r => r.json())
+    ])
+    .then(([hoje, amanha]) => {
+      const tbody = document.getElementById('tabela');
+      tbody.innerHTML = '';
 
-        const locais = json.local;
-        for (const id in locais) {
-          const { dico, latitude, longitude, data } = locais[id];
-          const rcm = data.rcm;
-          const riscoNome = ['Baixo','Moderado','Elevado','Muito Elevado','Máximo'][rcm - 1] || '—';
+      const locaisHoje = hoje.local;
+      const locaisAmanha = amanha.local;
 
-          const linha = document.createElement('tr');
-          linha.innerHTML = `
-            <td>${dico}</td>
-            <td>${latitude}</td>
-            <td>${longitude}</td>
-            <td class="cor rcm-${rcm}">${riscoNome}</td>
-          `;
-          tbody.appendChild(linha);
-        }
-      })
-      .catch(error => {
-        const tbody = document.getElementById('tabela');
-        tbody.innerHTML = `<tr><td colspan="4">Erro ao carregar dados: ${error.message}</td></tr>`;
-      });
+      for (const id in locaisHoje) {
+        const h = locaisHoje[id];
+        const a = locaisAmanha[id];
+        if (!h || !a) continue;
+
+        const rcmHoje = h.data.rcm;
+        const rcmAmanha = a.data.rcm;
+
+        const linha = document.createElement('tr');
+        linha.innerHTML = `
+          <td>${id}</td>
+          <td>${h.latitude}</td>
+          <td>${h.longitude}</td>
+          <td class="cor rcm-${rcmHoje}">${rcmHoje}</td>
+          <td class="cor rcm-${rcmAmanha}">${rcmAmanha}</td>
+        `;
+        tbody.appendChild(linha);
+      }
+    })
+    .catch(error => {
+      const tbody = document.getElementById('tabela');
+      tbody.innerHTML = `<tr><td colspan="5">Erro ao carregar dados: ${error.message}</td></tr>`;
+    });
   </script>
 </body>
 </html>
