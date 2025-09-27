@@ -57,6 +57,14 @@
   </div>
 
   <script>
+    const nomes = {
+      1: 'Baixo',
+      2: 'Moderado',
+      3: 'Elevado',
+      4: 'Muito Elevado',
+      5: 'Máximo'
+    };
+
     Promise.all([
       fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json').then(r => r.json()),
       fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json').then(r => r.json())
@@ -76,13 +84,16 @@
         const rcmHoje = h.data.rcm;
         const rcmAmanha = a.data.rcm;
 
+        const nomeHoje = nomes[rcmHoje] || '—';
+        const nomeAmanha = nomes[rcmAmanha] || '—';
+
         const linha = document.createElement('tr');
         linha.innerHTML = `
           <td>${id}</td>
           <td>${h.latitude}</td>
           <td>${h.longitude}</td>
-          <td class="cor rcm-${rcmHoje}">${rcmHoje}</td>
-          <td class="cor rcm-${rcmAmanha}">${rcmAmanha}</td>
+          <td class="cor rcm-${rcmHoje}">${nomeHoje}</td>
+          <td class="cor rcm-${rcmAmanha}">${nomeAmanha}</td>
         `;
         tbody.appendChild(linha);
       }
