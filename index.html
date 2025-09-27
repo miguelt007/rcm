@@ -1,170 +1,58 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-  <meta charset="UTF-8" />
-  <title>Risco de Incêndio</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <title>Dashboard de Risco</title>
   <style>
-    body { font-family: sans-serif; padding: 1em; }
-    h2 { text-align: center; }
-    label, select { font-size: 1em; margin-right: 0.5em; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
-    th, td { padding: 0.5em; border: 1px solid #ccc; text-align: center; }
-    tr:nth-child(even) { background: #f9f9f9; }
-    .cor { font-weight: bold; color: #fff; }
-    .rcm-1 { background: #509e2f; }     /* Reduzido */
-    .rcm-2 { background: #ffe900; color: #000; } /* Moderado */
-    .rcm-3 { background: #e87722; }     /* Elevado */
-    .rcm-4 { background: #cb333b; }     /* Muito Elevado */
-    .rcm-5 { background: #6f263d; }     /* Máximo */
-    .aumento::after { content: " 🔺"; }
-
-    .legenda {
-      margin-top: 2em;
-      max-width: 300px;
-      padding: 0.5em;
-      background: #f0f0f0;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 0.95em;
+    body {
+      font-family: sans-serif;
+      margin: 20px;
     }
-    .legenda-item {
-      display: flex;
-      align-items: center;
-      margin-bottom: 0.5em;
+    #filtroConcelho {
+      padding: 8px;
+      font-size: 16px;
+      width: 300px;
+      margin-bottom: 10px;
     }
-    .legenda-box {
-      width: 20px;
-      height: 20px;
-      margin-right: 0.5em;
-      border: 1px solid #ccc;
+    ul {
+      list-style: none;
+      padding: 0;
     }
-    .rcm-1 .legenda-box { background: #509e2f; color: #222; }
-    .rcm-2 .legenda-box { background: #ffe900; color: #222; }
-    .rcm-3 .legenda-box { background: #e87722; color: #fff; }
-    .rcm-4 .legenda-box { background: #cb333b; color: #fff; }
-    .rcm-5 .legenda-box { background: #6f263d; color: #fff; }
-    .legenda-item.rcm-3,
-    .legenda-item.rcm-4,
-    .legenda-item.rcm-5 {
-      color: #fff;
+    li {
+      padding: 6px 0;
     }
-    .legenda-item.rcm-1 {
-  color: #fff;
-}
-.legenda-item.rcm-2 {
-  color: #222;
-}
   </style>
 </head>
 <body>
-  <h2>Risco de Incêndio</h2>
 
-  <label for="filtro">Filtrar por risco:</label>
-  <select id="filtro">
-    <option value="0">Todos</option>
-    <option value="1">Reduzido</option>
-    <option value="2">Moderado</option>
-    <option value="3">Elevado</option>
-    <option value="4">Muito Elevado</option>
-    <option value="5">Máximo</option>
-  </select>
+  <h2>Filtrar por concelho</h2>
+  <input type="text" id="filtroConcelho" placeholder="Escreve o nome do concelho..." oninput="filtrarPorNome()" />
 
-  <table>
-    <thead>
-      <tr>
-        <th>Concelho</th>
-        <th>Latitude</th>
-        <th>Longitude</th>
-        <th colspan="2">rcm</th>
-      </tr>
-      <tr>
-        <th></th><th></th><th></th><th>Hoje</th><th>Amanhã</th>
-      </tr>
-    </thead>
-    <tbody id="tabela">
-      <tr><td colspan="5">A carregar dados...</td></tr>
-    </tbody>
-  </table>
-
-  <div class="legenda">
-    <h3>Legenda de Risco</h3>
-    <div class="legenda-item rcm-5"><div class="legenda-box"></div>Máximo</div>
-    <div class="legenda-item rcm-4"><div class="legenda-box"></div>Muito Elevado</div>
-    <div class="legenda-item rcm-3"><div class="legenda-box"></div>Elevado</div>
-    <div class="legenda-item rcm-2"><div class="legenda-box"></div>Moderado</div>
-    <div class="legenda-item rcm-1"><div class="legenda-box"></div>Reduzido</div>
-  </div>
+  <ul id="listaConcelhos">
+    <li>Lisboa</li>
+    <li>Loures</li>
+    <li>Torres Vedras</li>
+    <li>Sobral de Monte Agraço</li>
+    <li>Vila Franca de Xira</li>
+    <li>Odivelas</li>
+    <li>Amadora</li>
+    <li>Sintra</li>
+    <li>Cascais</li>
+    <li>Oeiras</li>
+    <!-- Adiciona os restantes -->
+  </ul>
 
   <script>
-    const nomes = {
-      1: 'Reduzido',
-      2: 'Moderado',
-      3: 'Elevado',
-      4: 'Muito Elevado',
-      5: 'Máximo'
-    };
+    function filtrarPorNome() {
+      const termo = document.getElementById("filtroConcelho").value.toLowerCase();
+      const itens = document.querySelectorAll("#listaConcelhos li");
 
-    let dados = [];
-
-    document.getElementById('filtro').addEventListener('change', () => {
-      const nivel = parseInt(document.getElementById('filtro').value);
-      renderTabela(nivel);
-    });
-
-    function renderTabela(filtro) {
-      const tbody = document.getElementById('tabela');
-      tbody.innerHTML = '';
-
-      for (const linha of dados) {
-        const { lat, lon, rcmHoje, rcmAmanha, nomeConcelho } = linha;
-        if (filtro > 0 && rcmHoje !== filtro && rcmAmanha !== filtro) continue;
-
-        const nomeHoje = nomes[rcmHoje] || '—';
-        const nomeAmanha = nomes[rcmAmanha] || '—';
-        const aumento = rcmAmanha > rcmHoje ? 'aumento' : '';
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${nomeConcelho}</td>
-          <td>${lat}</td>
-          <td>${lon}</td>
-          <td class="cor rcm-${rcmHoje}">${nomeHoje}</td>
-          <td class="cor rcm-${rcmAmanha} ${aumento}">${nomeAmanha}</td>
-        `;
-        tbody.appendChild(tr);
-      }
+      itens.forEach(item => {
+        const nome = item.textContent.toLowerCase();
+        item.style.display = nome.includes(termo) ? "" : "none";
+      });
     }
-
-    Promise.all([
-      fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json').then(r => r.json()),
-      fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json').then(r => r.json()),
-      fetch('concelhos.json').then(r => r.json())
-    ])
-    .then(([hoje, amanha, mapaConcelhos]) => {
-      const locaisHoje = hoje.local;
-      const locaisAmanha = amanha.local;
-
-      for (const id in locaisHoje) {
-        const h = locaisHoje[id];
-        const a = locaisAmanha[id];
-        if (!h || !a) continue;
-
-        dados.push({
-          lat: h.latitude,
-          lon: h.longitude,
-          rcmHoje: h.data.rcm,
-          rcmAmanha: a.data.rcm,
-          nomeConcelho: mapaConcelhos[id] || id
-        });
-      }
-
-      renderTabela(0); // mostra tudo por defeito
-    })
-    .catch(error => {
-      const tbody = document.getElementById('tabela');
-      tbody.innerHTML = `<tr><td colspan="5">Erro ao carregar dados: ${error.message}</td></tr>`;
-    });
   </script>
+
 </body>
 </html>
