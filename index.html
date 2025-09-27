@@ -6,14 +6,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    #map { height: 95vh; }
-    body { margin: 0; font-family: sans-serif; }
-    h2 { text-align: center; margin: 0.5em 0; }
+    body { margin: 0; font-family: sans-serif; display: flex; }
+    #map { height: 100vh; width: 70%; }
+    #tabela { width: 30%; padding: 1em; overflow-y: scroll; background: #f9f9f9; }
+    h2 { margin-top: 0; text-align: center; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.4em; border-bottom: 1px solid #ccc; text-align: left; }
+    tr:hover { background: #eee; }
   </style>
 </head>
 <body>
-  <h2>Risco de Incêndio</h2>
   <div id="map"></div>
+  <div id="tabela">
+    <h2>Risco de Incêndio</h2>
+    <table id="dados">
+      <thead>
+        <tr><th>Concelho</th><th>Risco</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
@@ -22,32 +34,35 @@
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    function getColor(rcm) {
-      return {
-        1: '#ffffb2',
-        2: '#fecc5c',
-        3: '#fd8d3c',
-        4: '#f03b20',
-        5: '#bd0026'
-      }[rcm] || '#ccc';
-    }
+    const legenda = ['Baixo','Moderado','Elevado','Muito Elevado','Máximo'];
+    const cores = ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'];
 
     fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json')
       .then(res => res.json())
-      .then(data => {
-        data.data.forEach(entry => {
-          const { DICO, rcm, latitude, longitude } = entry;
-          if (!latitude || !longitude) return;
+      .then(json => {
+        const dados = json.data.filter(e => e.latitude && e.longitude);
+        const tabela = document.querySelector('#dados tbody');
 
-          const legenda = ['Baixo','Moderado','Elevado','Muito Elevado','Máximo'][rcm - 1] || 'Sem dados';
-          const popup = `<strong>Concelho ${DICO}</strong><br>Risco: ${legenda} (${rcm})`;
+        // Ordenar por risco decrescente
+        dados.sort((a, b) => b.rcm - a.rcm);
 
+        dados.forEach(({ DICO, rcm, latitude, longitude }) => {
+          const nome = `Concelho ${DICO}`;
+          const risco = legenda[rcm - 1] || 'Sem dados';
+          const cor = cores[rcm - 1] || '#ccc';
+
+          // Mapa
           L.circleMarker([latitude, longitude], {
             radius: 6,
-            color: getColor(rcm),
-            fillColor: getColor(rcm),
+            color: cor,
+            fillColor: cor,
             fillOpacity: 0.7
-          }).addTo(map).bindPopup(popup);
+          }).addTo(map).bindPopup(`<strong>${nome}</strong><br>Risco: ${risco} (${rcm})`);
+
+          // Tabela
+          const linha = document.createElement('tr');
+          linha.innerHTML = `<td>${nome}</td><td>${risco}</td>`;
+          tabela.appendChild(linha);
         });
       });
   </script>
