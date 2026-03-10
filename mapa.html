@@ -39,43 +39,36 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
 }).addTo(map);
 
 let camada;
+let concelhos = {}; // DICO -> Nome do concelho
 
 // cores por risco
 function corRisco(r){
-  return {
-    1:"#00cc00",
-    2:"#ffff00",
-    3:"#ff9900",
-    4:"#ff3300",
-    5:"#990000"
-  }[r] || "#999";
+  return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999";
+}
+function nomeRisco(r){
+  return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados";
 }
 
-// nome do risco
-function nomeRisco(r){
-  return {
-    1:"Reduzido",
-    2:"Moderado",
-    3:"Elevado",
-    4:"Muito Elevado",
-    5:"Máximo"
-  }[r] || "Sem dados";
+// carregar concelhos.json local
+async function carregarConcelhos(){
+  const res = await fetch('concelhos.json');
+  concelhos = await res.json();
 }
 
 // carregar dados IPMA e desenhar pontos
 async function carregar(dia){
   const url = "https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
-  const resposta = await fetch(url);
-  const dados = await resposta.json();
+  const res = await fetch(url);
+  const dados = await res.json();
 
   if(camada) map.removeLayer(camada);
   camada = L.layerGroup();
 
   Object.values(dados.local).forEach(c=>{
     const risco = c.data.rcm;
-    const nomeConcelho = c.local; // nome do concelho direto da API
+    const nomeConcelho = concelhos[c.dico] || "Sem nome";
 
-    const marcador = L.circleMarker([c.latitude,c.longitude],{
+    const marker = L.circleMarker([c.latitude,c.longitude],{
       radius:7,
       color:corRisco(risco),
       fillColor:corRisco(risco),
@@ -83,18 +76,24 @@ async function carregar(dia){
       weight:1
     });
 
-    marcador.bindPopup(`<b>Concelho:</b> ${nomeConcelho}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
+    // tooltip instantâneo e popup
+    marker.bindTooltip(`<b>${nomeConcelho}</b><br>Alerta: ${nomeRisco(risco)}`, {sticky:true});
+    marker.bindPopup(`<b>Concelho:</b> ${nomeConcelho}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
 
-    marcador.addTo(camada);
+    marker.addTo(camada);
   });
 
   camada.addTo(map);
 }
 
-// carregar hoje
-carregar(0);
+// inicialização
+async function init(){
+  await carregarConcelhos();
+  await carregar(0);
+}
+init();
 
-// mudar dia
+// selector Hoje/Amanhã
 document.getElementById("dia").addEventListener("change", e=>{
   carregar(e.target.value);
 });
