@@ -46,9 +46,11 @@ let riscosIPMA = {};
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar GeoJSON local
+// carregar GeoJSON via raw GitHub + proxy CORS
 async function carregarGeoJSON(){
-  const res = await fetch('ContinenteConcelhos.geojson'); // deve estar na mesma pasta
+  const url = 'https://raw.githubusercontent.com/nmota/caop_GeoJSON/master/geograficas/ContinenteConcelhos.geojson';
+  // usar proxy para evitar bloqueio CORS
+  const res = await fetch('https://cors-anywhere.herokuapp.com/' + url);
   geojsonData = await res.json();
 }
 
@@ -64,7 +66,7 @@ async function carregarRisco(dia){
   });
 }
 
-// desenhar pontos no centro do concelho
+// desenhar pontos nos centroides
 function desenharMapa(){
   if(camada) map.removeLayer(camada);
   camada = L.layerGroup();
