@@ -27,31 +27,28 @@ Selecionar dia:
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+
 <script>
-
+// Inicializar mapa
 const map = L.map('map').setView([39.5,-8],7);
-
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
   attribution:'&copy; OpenStreetMap &copy; CARTO',
   subdomains:'abcd',
   maxZoom:19
 }).addTo(map);
 
-let geojsonData;
 let camada;
+let concelhos = {};
 let riscosIPMA = {};
 
 // cores e nomes de risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar GeoJSON via raw GitHub + proxy CORS
-async function carregarGeoJSON(){
-  const url = 'https://raw.githubusercontent.com/nmota/caop_GeoJSON/master/geograficas/ContinenteConcelhos.geojson';
-  // usar proxy para evitar bloqueio CORS
-  const res = await fetch('https://cors-anywhere.herokuapp.com/' + url);
-  geojsonData = await res.json();
+// carregar concelhos.json (DICO -> nome)
+async function carregarConcelhos(){
+  const res = await fetch('concelhos.json'); // deve estar na mesma pasta
+  concelhos = await res.json();
 }
 
 // carregar risco IPMA
@@ -59,27 +56,23 @@ async function carregarRisco(dia){
   const url = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
   const res = await fetch(url);
   const data = await res.json();
-
   riscosIPMA = {};
   Object.values(data.local).forEach(c=>{
-    if(c.dico.length===4) riscosIPMA[c.dico] = c.data.rcm;
+    if(c.dico.length===4) riscosIPMA[c.dico] = { risco: c.data.rcm, lat: c.latitude, lon: c.longitude };
   });
 }
 
-// desenhar pontos nos centroides
+// desenhar pontos
 function desenharMapa(){
   if(camada) map.removeLayer(camada);
   camada = L.layerGroup();
 
-  geojsonData.features.forEach(f=>{
-    const DICO = f.properties.DICO;
-    const nome = f.properties.Concelho;
-    const risco = riscosIPMA[DICO] || 0;
+  Object.keys(riscosIPMA).forEach(dico=>{
+    const c = riscosIPMA[dico];
+    const nome = concelhos[dico] || "Sem nome";
+    const risco = c.risco;
 
-    const centroide = turf.centroid(f);
-    const [lon, lat] = centroide.geometry.coordinates;
-
-    const marker = L.circleMarker([lat,lon],{
+    const marker = L.circleMarker([c.lat, c.lon],{
       radius:7,
       color: corRisco(risco),
       fillColor: corRisco(risco),
@@ -104,7 +97,7 @@ async function atualizar(dia){
 
 // inicialização
 async function init(){
-  await carregarGeoJSON();
+  await carregarConcelhos();
   await atualizar(0);
 }
 init();
