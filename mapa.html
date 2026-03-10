@@ -14,7 +14,7 @@ body{margin:0;font-family:Arial;}
 </head>
 <body>
 
-<div id="topbar">Mapa de Risco de Incêndio em Portugal (Continente)</div>
+<div id="topbar">Mapa de Risco de Incêndio em Portugal (Incluindo Ilhas)</div>
 
 <div id="controls">
 Selecionar dia:
@@ -39,37 +39,34 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
 
 let camada;
 let dados = [];
-let centroides = {};
 
 // cores e nomes de risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar dados
+// carregar dados da API + concelhos.json
 Promise.all([
   fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json').then(r => r.json()),
   fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json').then(r => r.json()),
-  fetch('concelhos.json').then(r => r.json()),
-  fetch('centroides.json').then(r => r.json())
+  fetch('concelhos.json').then(r => r.json())
 ])
-.then(([hoje, amanha, mapaConcelhos, cts]) => {
-  centroides = cts;
+.then(([hoje, amanha, mapaConcelhos]) => {
   const locaisHoje = hoje.local;
   const locaisAmanha = amanha.local;
 
   dados = Object.keys(locaisHoje).map(id => {
     const h = locaisHoje[id];
     const a = locaisAmanha[id];
-    if(!h || !a || !centroides[id]) return null;
+    if(!h || !a) return null;
 
     return {
-      lat: centroides[id].lat,
-      lon: centroides[id].lon,
+      lat: h.latitude,
+      lon: h.longitude,
       rcmHoje: h.data.rcm,
       rcmAmanha: a.data.rcm,
       nomeConcelho: mapaConcelhos[id] || id
     };
-  }).filter(d => d!==null);
+  }).filter(d => d !== null);
 
   desenharPontos(0);
 });
