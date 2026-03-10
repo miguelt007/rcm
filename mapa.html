@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<title>Mapa de Risco de Incêndio</title>
+<title>Mapa de Risco de Incêndio em Portugal</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
 body{margin:0;font-family:Arial,Helvetica,sans-serif;}
@@ -28,7 +28,6 @@ Dia:
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 <script>
 
 const map = L.map('map').setView([39.6,-8],7);
@@ -36,21 +35,21 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap'
 }).addTo(map);
 
-let geojsonData = null;
+let concelhosData = [];
 let riscosIPMA = {};
 let markersLayer;
 
-// cores do risco
+// cores e nomes do risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#660000"}[r] || "#cccccc"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar GeoJSON do CAOP (simplificado se necessário)
-async function carregarGeoJSON(){
-  const res = await fetch('ContinenteConcelhos.geojson'); // coloca este ficheiro na mesma pasta
-  geojsonData = await res.json();
+// carregar concelhos local
+async function carregarConcelhos(){
+  const res = await fetch('concelhos.json');
+  concelhosData = await res.json();
 }
 
-// carregar API IPMA
+// carregar riscos IPMA
 async function carregarRisco(dia){
   const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
   const data = await res.json();
@@ -58,27 +57,25 @@ async function carregarRisco(dia){
   Object.values(data.local).forEach(c => { riscosIPMA[c.dico] = c.data.rcm; });
 }
 
-// calcular centroide e desenhar pontos
+// desenhar pontos
 function desenharMapa(){
   if(markersLayer) map.removeLayer(markersLayer);
   markersLayer = L.layerGroup();
 
-  geojsonData.features.forEach(f => {
-    const DICO = f.properties.DICO;
-    const nome = f.properties.Concelho;
-    const centroide = turf.centroid(f); // usa turf para o centro
-    const [lon, lat] = centroide.geometry.coordinates;
-    const risco = riscosIPMA[DICO] || 0;
-
-    const marker = L.circleMarker([lat, lon], {
-      radius: 8,
-      fillColor: corRisco(risco),
-      color: "#555",
-      weight: 1,
-      fillOpacity: 0.9
-    }).bindTooltip(`${nome}<br>Risco: ${nomeRisco(risco)}`);
-
-    markersLayer.addLayer(marker);
+  concelhosData.forEach(c=>{
+    const lat = parseFloat(c.latitude);
+    const lon = parseFloat(c.longitude);
+    if(!isNaN(lat) && !isNaN(lon)){
+      const risco = riscosIPMA[c.DICO] || 0;
+      const marker = L.circleMarker([lat, lon], {
+        radius: 8,
+        fillColor: corRisco(risco),
+        color: "#555",
+        weight: 1,
+        fillOpacity: 0.8
+      }).bindTooltip(`${c.Concelho}<br>Risco: ${nomeRisco(risco)}`);
+      markersLayer.addLayer(marker);
+    }
   });
 
   markersLayer.addTo(map);
@@ -92,7 +89,7 @@ async function atualizar(dia){
 
 // inicialização
 async function init(){
-  await carregarGeoJSON();
+  await carregarConcelhos();
   await atualizar(0);
 }
 init();
