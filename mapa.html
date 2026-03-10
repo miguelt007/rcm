@@ -38,41 +38,48 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
 }).addTo(map);
 
 let camada;
-let concelhos = {};
-let riscosIPMA = {};
+let dados = [];
 
 // cores e nomes de risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar concelhos.json (DICO -> nome)
-async function carregarConcelhos(){
-  const res = await fetch('concelhos.json'); // deve estar na mesma pasta
-  concelhos = await res.json();
-}
+// carregar dados
+Promise.all([
+  fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json').then(r => r.json()),
+  fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json').then(r => r.json()),
+  fetch('concelhos.json').then(r => r.json())
+])
+.then(([hoje, amanha, mapaConcelhos]) => {
+  const locaisHoje = hoje.local;
+  const locaisAmanha = amanha.local;
 
-// carregar risco IPMA
-async function carregarRisco(dia){
-  const url = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
-  const res = await fetch(url);
-  const data = await res.json();
-  riscosIPMA = {};
-  Object.values(data.local).forEach(c=>{
-    if(c.dico.length===4) riscosIPMA[c.dico] = { risco: c.data.rcm, lat: c.latitude, lon: c.longitude };
-  });
-}
+  for (const id in locaisHoje) {
+    const h = locaisHoje[id];
+    const a = locaisAmanha[id];
+    if (!h || !a) continue;
+
+    dados.push({
+      lat: h.latitude,
+      lon: h.longitude,
+      rcmHoje: h.data.rcm,
+      rcmAmanha: a.data.rcm,
+      nomeConcelho: mapaConcelhos[id] || id
+    });
+  }
+
+  desenharPontos(0); // carregar hoje
+});
 
 // desenhar pontos
-function desenharMapa(){
+function desenharPontos(dia){
   if(camada) map.removeLayer(camada);
   camada = L.layerGroup();
 
-  Object.keys(riscosIPMA).forEach(dico=>{
-    const c = riscosIPMA[dico];
-    const nome = concelhos[dico] || "Sem nome";
-    const risco = c.risco;
+  dados.forEach(d=>{
+    const risco = dia === 0 ? d.rcmHoje : d.rcmAmanha;
 
-    const marker = L.circleMarker([c.lat, c.lon],{
+    const marker = L.circleMarker([d.lat,d.lon],{
       radius:7,
       color: corRisco(risco),
       fillColor: corRisco(risco),
@@ -80,8 +87,8 @@ function desenharMapa(){
       weight:1
     });
 
-    marker.bindTooltip(`<b>${nome}</b><br>Alerta: ${nomeRisco(risco)}`, {sticky:true});
-    marker.bindPopup(`<b>Concelho:</b> ${nome}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
+    marker.bindTooltip(`<b>${d.nomeConcelho}</b><br>Alerta: ${nomeRisco(risco)}`, {sticky:true});
+    marker.bindPopup(`<b>Concelho:</b> ${d.nomeConcelho}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
 
     marker.addTo(camada);
   });
@@ -89,22 +96,9 @@ function desenharMapa(){
   camada.addTo(map);
 }
 
-// atualizar mapa
-async function atualizar(dia){
-  await carregarRisco(dia);
-  desenharMapa();
-}
-
-// inicialização
-async function init(){
-  await carregarConcelhos();
-  await atualizar(0);
-}
-init();
-
 // selector Hoje/Amanhã
 document.getElementById("dia").addEventListener("change", e=>{
-  atualizar(e.target.value);
+  desenharPontos(parseInt(e.target.value));
 });
 
 // legenda
