@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<title>Mapa de Risco de Incêndio</title>
+<title>Mapa de Risco de Incêndio em Portugal</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
 body{margin:0;font-family:Arial,Helvetica,sans-serif;}
@@ -35,75 +35,66 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap'
 }).addTo(map);
 
-let geojsonLayer;
-let geojsonData;
+let concelhosData = [];
 let riscosIPMA = {};
 
-// cores do risco
+// Cores e nomes do risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#660000"}[r] || "#cccccc"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar GeoJSON local
-async function carregarGeoJSON(){
-  const res = await fetch('ContinenteConcelhos.geojson');
-  geojsonData = await res.json();
+// Carregar concelhos.json
+async function carregarConcelhos(){
+  const res = await fetch('https://raw.githubusercontent.com/miguelt007/rcm/refs/heads/main/concelhos.json');
+  const data = await res.json();
+  concelhosData = data;
 }
 
-// carregar riscos IPMA
+// Carregar riscos IPMA
 async function carregarRisco(dia){
   const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
   const data = await res.json();
   riscosIPMA = {};
-  Object.values(data.local).forEach(c => { riscosIPMA[c.dico] = c.data.rcm; });
+  Object.values(data.local).forEach(c => {
+    riscosIPMA[c.dico] = c.data.rcm;
+  });
 }
 
-// estilizar polígonos
-function styleFeature(feature){
-  const DICO = feature.properties.DICO;
-  const risco = riscosIPMA[DICO] || 0;
-  return {
-    fillColor: corRisco(risco),
-    weight: 1,
-    opacity: 1,
-    color: "#555",
-    fillOpacity: 0.7
-  };
-}
-
-// desenhar o GeoJSON no mapa
+// Desenhar polígonos simplificados (usando círculos no centro do concelho)
 function desenharMapa(){
-  if(geojsonLayer) map.removeLayer(geojsonLayer);
+  map.eachLayer(l=>{ if(l.options && l.options.fillColor) map.removeLayer(l); });
 
-  geojsonLayer = L.geoJSON(geojsonData,{
-    style: styleFeature,
-    onEachFeature: function(feature, layer){
-      const DICO = feature.properties.DICO;
-      const nome = feature.properties.Concelho;
-      const risco = riscosIPMA[DICO] || 0;
-      layer.bindTooltip(`${nome}<br>Risco: ${nomeRisco(risco)}`);
-    }
-  }).addTo(map);
+  concelhosData.forEach(c => {
+    const risco = riscosIPMA[c.DICO] || 0;
+    L.circle([c.latitude, c.longitude], {
+      radius: 1200, // simplificação: círculo de 1.2 km
+      fillColor: corRisco(risco),
+      color: "#555",
+      weight: 0.6,
+      fillOpacity: 0.8
+    }).bindTooltip(`${c.Concelho}<br>Risco: ${nomeRisco(risco)}`)
+      .addTo(map);
+  });
 }
 
-// atualizar mapa
+// Atualizar mapa
 async function atualizar(dia){
   await carregarRisco(dia);
   desenharMapa();
 }
 
-// inicialização
+// Inicialização
 async function init(){
-  await carregarGeoJSON();
+  await carregarConcelhos();
   await atualizar(0);
 }
 init();
 
-// selector Hoje/Amanhã
+// Selector Hoje/Amanhã
 document.getElementById("dia").addEventListener("change", e=>{
   atualizar(e.target.value);
 });
 
-// legenda
+// Legenda
 const legenda = L.control({position:"bottomright"});
 legenda.onAdd = function(){
   const div = L.DomUtil.create("div","legenda");
