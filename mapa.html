@@ -5,45 +5,16 @@
 <title>Mapa de Risco de Incêndio</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
-body{
-  font-family: Arial;
-  margin:0;
-  padding:0;
-}
-
-#topbar{
-  padding:10px;
-  background:#333;
-  color:white;
-  font-weight:bold;
-  text-align:center;
-  font-size:20px;
-}
-
-#controls{
-  padding:10px;
-  background:#f2f2f2;
-  border-bottom:1px solid #ccc;
-  text-align:center;
-}
-
-#map{
-  height:90vh;
-  width:100%;
-}
-
-.legenda{
-  background:white;
-  padding:10px;
-  line-height:18px;
-  color:#333;
-  box-shadow:0 0 5px rgba(0,0,0,0.3);
-}
+body{margin:0;font-family:Arial;}
+#topbar{padding:10px;background:#333;color:white;text-align:center;font-weight:bold;font-size:20px;}
+#controls{padding:10px;background:#f2f2f2;border-bottom:1px solid #ccc;text-align:center;}
+#map{height:90vh;width:100%;}
+.legenda{background:white;padding:10px;line-height:18px;color:#333;box-shadow:0 0 5px rgba(0,0,0,0.3);}
 </style>
 </head>
 <body>
 
-<div id="topbar">Mapa de Risco de Incêndio em Portugal</div>
+<div id="topbar">Mapa de Risco de Incêndio em Portugal (Continente)</div>
 
 <div id="controls">
 Selecionar dia:
@@ -56,86 +27,86 @@ Selecionar dia:
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 <script>
-const map = L.map('map').setView([39.5,-8],7);
+
+const map = L.map('map').setView([39.6,-8],7);
 
 // Tile escuro
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
-    subdomains: 'abcd',
-    maxZoom: 19
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap &copy; CARTO',
+  subdomains:'abcd',
+  maxZoom:19
 }).addTo(map);
 
+let geojsonData;
+let riscosIPMA = {};
 let camada;
-let concelhos = {}; // para mapear DICO → Nome do concelho
 
-// cores por risco
-function corRisco(r){
-  return {
-    1:"#00cc00",
-    2:"#ffff00",
-    3:"#ff9900",
-    4:"#ff3300",
-    5:"#990000"
-  }[r] || "#999";
+// cores do risco
+function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
+function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
+
+// carregar GeoJSON dos concelhos do continente
+async function carregarGeoJSON(){
+  const res = await fetch('ContinenteConcelhos.geojson'); // ficheiro local
+  geojsonData = await res.json();
 }
 
-// nome do risco
-function nomeRisco(r){
-  return {
-    1:"Reduzido",
-    2:"Moderado",
-    3:"Elevado",
-    4:"Muito Elevado",
-    5:"Máximo"
-  }[r] || "Sem dados";
+// carregar risco IPMA
+async function carregarRisco(dia){
+  const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
+  const data = await res.json();
+  riscosIPMA = {};
+  Object.values(data.local).forEach(c=>{ 
+    // só incluir DICO do continente (4 dígitos)
+    if(c.dico.length===4) riscosIPMA[c.dico] = c.data.rcm; 
+  });
 }
 
-// carregar concelhos.json local
-async function carregarConcelhos(){
-  const res = await fetch('concelhos.json');
-  concelhos = await res.json();
-}
-
-// carregar dados IPMA e desenhar pontos
-async function carregar(dia){
-  const url = "https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
-  const resposta = await fetch(url);
-  const dados = await resposta.json();
-
+// desenhar pontos nos centroides
+function desenharMapa(){
   if(camada) map.removeLayer(camada);
   camada = L.layerGroup();
 
-  Object.values(dados.local).forEach(c=>{
-    const risco = c.data.rcm;
-    const nomeConcelho = concelhos[c.dico] || "Sem nome";
+  geojsonData.features.forEach(f=>{
+    const DICO = f.properties.DICO;
+    const nome = f.properties.Concelho;
+    const risco = riscosIPMA[DICO] || 0;
 
-    const marcador = L.circleMarker([c.latitude,c.longitude],{
+    const centroide = turf.centroid(f);
+    const [lon, lat] = centroide.geometry.coordinates;
+
+    const marker = L.circleMarker([lat,lon],{
       radius:7,
       color:corRisco(risco),
       fillColor:corRisco(risco),
       fillOpacity:0.85,
       weight:1
-    });
+    }).bindPopup(`<b>Concelho:</b> ${nome}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
 
-    // popup com nome do concelho + alerta
-    marcador.bindPopup("<b>Concelho:</b> "+nomeConcelho+"<br><b>Alerta:</b> "+nomeRisco(risco));
-    marcador.addTo(camada);
+    marker.addTo(camada);
   });
 
   camada.addTo(map);
 }
 
+// atualizar mapa
+async function atualizar(dia){
+  await carregarRisco(dia);
+  desenharMapa();
+}
+
 // inicialização
 async function init(){
-  await carregarConcelhos();
-  await carregar(0);
+  await carregarGeoJSON();
+  await atualizar(0);
 }
 init();
 
-// mudar dia
+// selector Hoje/Amanhã
 document.getElementById("dia").addEventListener("change", e=>{
-  carregar(e.target.value);
+  atualizar(e.target.value);
 });
 
 // legenda
