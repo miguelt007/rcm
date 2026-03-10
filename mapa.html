@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<title>Mapa de Risco de Incêndio Simplificado</title>
+<title>Mapa de Risco de Incêndio em Portugal</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
 body{margin:0;font-family:Arial,Helvetica,sans-serif;}
@@ -35,9 +35,9 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap'
 }).addTo(map);
 
-let geoLayer;
+let concelhosData = [];
 let riscosIPMA = {};
-let nomesConcelho = {};
+let markersLayer;
 
 // cores do risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#660000"}[r] || "#cccccc"; }
@@ -45,9 +45,8 @@ function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito El
 
 // carregar concelhos.json
 async function carregarConcelhos(){
-  const res = await fetch('/concelhos.json'); // deve estar local ou no backend
-  const data = await res.json();
-  data.forEach(c => { nomesConcelho[c.DICO] = c.Concelho; });
+  const res = await fetch('https://raw.githubusercontent.com/miguelt007/rcm/refs/heads/main/concelhos.json');
+  concelhosData = await res.json();
 }
 
 // carregar API IPMA
@@ -58,33 +57,32 @@ async function carregarRisco(dia){
   Object.values(data.local).forEach(c => { riscosIPMA[c.dico] = c.data.rcm; });
 }
 
-// estilo do Leaflet
-function estilo(feature){
-  const DICO = feature.properties.DICO;
-  return {fillColor: corRisco(riscosIPMA[DICO]), weight:0.6, color:"#555", fillOpacity:0.8};
-}
+// desenhar pontos
+function desenharMapa(){
+  if(markersLayer) map.removeLayer(markersLayer);
 
-// carregar GeoJSON simplificado
-async function carregarMapa(){
-  const geo = await fetch('/geojson-simplificado.json').then(r=>r.json()); // geojson simplificado
-  geoLayer = L.geoJSON(geo,{
-    style: estilo,
-    onEachFeature: (feature, layer)=>{
-      const DICO = feature.properties.DICO;
-      const nome = nomesConcelho[DICO] || feature.properties.Concelho;
-      const risco = riscosIPMA[DICO];
-      layer.bindTooltip(`${nome}<br>Risco: ${nomeRisco(risco)}`);
-      layer.on('mouseover', ()=> layer.setStyle({weight:2, color:'#000'}));
-      layer.on('mouseout', ()=> layer.setStyle(estilo(feature)));
-    }
-  }).addTo(map);
+  markersLayer = L.layerGroup();
+
+  concelhosData.forEach(c => {
+    const risco = riscosIPMA[c.DICO] || 0;
+    const marker = L.circleMarker([c.latitude, c.longitude], {
+      radius: 8,
+      fillColor: corRisco(risco),
+      color: "#555",
+      weight: 1,
+      fillOpacity: 0.8
+    }).bindTooltip(`${c.Concelho}<br>Risco: ${nomeRisco(risco)}`);
+
+    markersLayer.addLayer(marker);
+  });
+
+  markersLayer.addTo(map);
 }
 
 // atualizar mapa
 async function atualizar(dia){
   await carregarRisco(dia);
-  if(geoLayer) map.removeLayer(geoLayer);
-  await carregarMapa();
+  desenharMapa();
 }
 
 // inicialização
