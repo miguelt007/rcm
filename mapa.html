@@ -29,6 +29,7 @@ Selecionar dia:
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
+// Inicializar mapa
 const map = L.map('map').setView([39.5,-8],7);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
   attribution:'&copy; OpenStreetMap &copy; CARTO',
@@ -42,18 +43,7 @@ let camada;
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// função para obter o concelho real via GeoAPI.pt
-async function getConcelho(lat, lon){
-    try {
-        const res = await fetch(`https://json.geoapi.pt/gps/${lat},${lon}?json=1`);
-        const data = await res.json();
-        return data.concelho || "Desconhecido";
-    } catch(e){
-        return "Desconhecido";
-    }
-}
-
-// carregar dados IPMA
+// carregar dados IPMA + GeoAPI.pt
 async function carregar(dia){
     const url = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
     const resp = await fetch(url);
@@ -62,29 +52,35 @@ async function carregar(dia){
     if(camada) map.removeLayer(camada);
     camada = L.layerGroup();
 
-    // iterar sobre os concelhos
-    for(const id in dados.local){
-        const c = dados.local[id];
+    // criar todas as promessas em paralelo
+    const promises = Object.values(dados.local).map(async c => {
         const risco = c.data.rcm;
         const lat = c.latitude;
         const lon = c.longitude;
 
-        // obter o nome real do concelho via GeoAPI.pt
-        const nomeConcelho = await getConcelho(lat, lon);
+        try {
+            const res = await fetch(`https://json.geoapi.pt/gps/${lat},${lon}?json=1`);
+            const geo = await res.json();
+            const nomeConcelho = geo.concelho || "Desconhecido";
 
-        const marker = L.circleMarker([lat, lon], {
-            radius:7,
-            color: corRisco(risco),
-            fillColor: corRisco(risco),
-            fillOpacity:0.85,
-            weight:1
-        });
+            const marker = L.circleMarker([lat, lon], {
+                radius:7,
+                color: corRisco(risco),
+                fillColor: corRisco(risco),
+                fillOpacity:0.85,
+                weight:1
+            });
 
-        marker.bindTooltip(`<b>${nomeConcelho}</b><br>Alerta: ${nomeRisco(risco)}`, {sticky:true});
-        marker.bindPopup(`<b>Concelho:</b> ${nomeConcelho}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
-        marker.addTo(camada);
-    }
+            marker.bindTooltip(`<b>${nomeConcelho}</b><br>Alerta: ${nomeRisco(risco)}`, {sticky:true});
+            marker.bindPopup(`<b>Concelho:</b> ${nomeConcelho}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
+            marker.addTo(camada);
 
+        } catch(e){
+            console.error("Erro GeoAPI:", e);
+        }
+    });
+
+    await Promise.all(promises);
     camada.addTo(map);
 }
 
