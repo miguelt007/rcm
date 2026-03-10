@@ -57,23 +57,26 @@ async function carregarRisco(dia){
   Object.values(data.local).forEach(c => { riscosIPMA[c.dico] = c.data.rcm; });
 }
 
-// desenhar pontos
+// desenhar pontos no mapa
 function desenharMapa(){
   if(markersLayer) map.removeLayer(markersLayer);
 
   markersLayer = L.layerGroup();
 
   concelhosData.forEach(c => {
-    const risco = riscosIPMA[c.DICO] || 0;
-    const marker = L.circleMarker([c.latitude, c.longitude], {
-      radius: 8,
-      fillColor: corRisco(risco),
-      color: "#555",
-      weight: 1,
-      fillOpacity: 0.8
-    }).bindTooltip(`${c.Concelho}<br>Risco: ${nomeRisco(risco)}`);
+    // só desenhar se existir latitude e longitude
+    if(c.latitude && c.longitude){
+      const risco = riscosIPMA[c.DICO] || 0;
+      const marker = L.circleMarker([c.latitude, c.longitude], {
+        radius: 8,
+        fillColor: corRisco(risco),
+        color: "#555",
+        weight: 1,
+        fillOpacity: 0.8
+      }).bindTooltip(`${c.Concelho}<br>Risco: ${nomeRisco(risco)}`);
 
-    markersLayer.addLayer(marker);
+      markersLayer.addLayer(marker);
+    }
   });
 
   markersLayer.addTo(map);
