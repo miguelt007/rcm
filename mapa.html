@@ -3,35 +3,44 @@
 <head>
 
 <meta charset="utf-8">
-<title>Mapa de Risco de Incêndio</title>
+
+<title>Mapa de Risco de Incêndio em Portugal</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
 
 body{
-font-family: Arial;
 margin:0;
-padding:0;
+font-family:Arial;
+background:#f4f4f4;
 }
 
-#topbar{
+header{
+background:#b30000;
+color:white;
+padding:15px;
+text-align:center;
+font-size:22px;
+font-weight:bold;
+}
+
+#controls{
 padding:10px;
-background:#f2f2f2;
+background:white;
 border-bottom:1px solid #ccc;
+text-align:center;
 }
 
 #map{
-height:90vh;
-width:100%;
+height:85vh;
 }
 
 .legenda{
 background:white;
 padding:10px;
 line-height:18px;
-color:#333;
-box-shadow:0 0 5px rgba(0,0,0,0.3);
+box-shadow:0 0 5px rgba(0,0,0,0.4);
 }
 
 </style>
@@ -40,7 +49,11 @@ box-shadow:0 0 5px rgba(0,0,0,0.3);
 
 <body>
 
-<div id="topbar">
+<header>
+Mapa de Risco de Incêndio em Portugal
+</header>
+
+<div id="controls">
 
 Selecionar dia:
 
@@ -57,110 +70,130 @@ Selecionar dia:
 
 <script>
 
-const map = L.map('map').setView([39.5,-8],7);
+const map = L.map('map').setView([39.6,-8],7);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-attribution:'© OpenStreetMap'
-}).addTo(map);
+L.tileLayer(
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+{ attribution:'© OpenStreetMap'}
+).addTo(map);
 
-let camada;
+let geoLayer;
+let riscos={};
 
-// cores por risco
 function corRisco(r){
 
-return {
+return{
 1:"#00cc00",
 2:"#ffff00",
 3:"#ff9900",
 4:"#ff3300",
-5:"#990000"
-}[r] || "#999";
+5:"#660000"
+}[r] || "#cccccc";
 
 }
 
-// nome do risco
 function nomeRisco(r){
 
-return {
+return{
 1:"Reduzido",
 2:"Moderado",
 3:"Elevado",
 4:"Muito Elevado",
 5:"Máximo"
-}[r];
+}[r] || "Sem dados";
 
 }
 
-async function carregar(dia){
+async function carregarRisco(dia){
 
-const url = "https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
+const url="https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
 
-const resposta = await fetch(url);
+const res=await fetch(url);
 
-const dados = await resposta.json();
+const data=await res.json();
 
-if(camada) map.removeLayer(camada);
+riscos={};
 
-camada = L.layerGroup();
+Object.values(data.local).forEach(c=>{
 
-Object.values(dados.local).forEach(c=>{
-
-const risco = c.data.rcm;
-
-const marcador = L.circleMarker(
-
-[c.latitude,c.longitude],
-{
-radius:7,
-color:corRisco(risco),
-fillColor:corRisco(risco),
-fillOpacity:0.85,
-weight:1
-}
-
-);
-
-marcador.bindPopup(
-
-"<b>Concelho:</b> "+c.local+"<br>"+
-"<b>Risco:</b> "+nomeRisco(risco)
-
-);
-
-marcador.addTo(camada);
+riscos[c.DICO]=c.data.rcm;
 
 });
 
-camada.addTo(map);
+}
+
+function estilo(feature){
+
+const id=feature.properties.DICO;
+
+const risco=riscos[id];
+
+return{
+
+fillColor:corRisco(risco),
+weight:0.6,
+color:"#555",
+fillOpacity:0.8
+
+};
 
 }
 
-// carregar hoje
-carregar(0);
+async function carregarMapa(){
 
-// mudar dia
+const geo=await fetch("concelhos.geojson").then(r=>r.json());
+
+geoLayer=L.geoJSON(geo,{
+style:estilo,
+onEachFeature:(feature,layer)=>{
+
+const id=feature.properties.DICO;
+
+const risco=riscos[id];
+
+layer.bindTooltip(
+feature.properties.concelho+
+"<br>Risco: "+nomeRisco(risco)
+);
+
+}
+}).addTo(map);
+
+}
+
+async function atualizar(dia){
+
+await carregarRisco(dia);
+
+if(geoLayer){
+map.removeLayer(geoLayer);
+}
+
+await carregarMapa();
+
+}
+
 document.getElementById("dia").addEventListener("change",e=>{
 
-carregar(e.target.value);
+atualizar(e.target.value);
 
 });
 
+atualizar(0);
 
-// legenda
+const legenda=L.control({position:"bottomright"});
 
-const legenda = L.control({position:'bottomright'});
+legenda.onAdd=function(){
 
-legenda.onAdd = function(){
+const div=L.DomUtil.create("div","legenda");
 
-const div = L.DomUtil.create('div','legenda');
-
-div.innerHTML =
+div.innerHTML=
 "<b>Risco de Incêndio</b><br>"+
 "<i style='background:#00cc00;width:12px;height:12px;display:inline-block'></i> Reduzido<br>"+
 "<i style='background:#ffff00;width:12px;height:12px;display:inline-block'></i> Moderado<br>"+
 "<i style='background:#ff9900;width:12px;height:12px;display:inline-block'></i> Elevado<br>"+
 "<i style='background:#ff3300;width:12px;height:12px;display:inline-block'></i> Muito Elevado<br>"+
-"<i style='background:#990000;width:12px;height:12px;display:inline-block'></i> Máximo";
+"<i style='background:#660000;width:12px;height:12px;display:inline-block'></i> Máximo";
 
 return div;
 
