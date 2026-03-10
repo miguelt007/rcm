@@ -39,7 +39,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
 }).addTo(map);
 
 let camada;
-let concelhos = {}; // DICO -> Nome do concelho
+let concelhos = {}; // DICO -> Nome
 
 // cores por risco
 function corRisco(r){
@@ -49,7 +49,7 @@ function nomeRisco(r){
   return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados";
 }
 
-// carregar concelhos.json local
+// carregar concelhos.json
 async function carregarConcelhos(){
   const res = await fetch('concelhos.json');
   concelhos = await res.json();
@@ -70,8 +70,8 @@ async function carregar(dia){
 
     const marker = L.circleMarker([c.latitude,c.longitude],{
       radius:7,
-      color:corRisco(risco),
-      fillColor:corRisco(risco),
+      color: corRisco(risco),
+      fillColor: corRisco(risco),
       fillOpacity:0.85,
       weight:1
     });
