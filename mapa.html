@@ -159,7 +159,7 @@ fillOpacity:0.8
 async function carregarMapa(){
 
 const geo = await fetch(
-"https://raw.githubusercontent.com/nmota/caop_GeoJSON/master/ContinenteConcelhos.geojson"
+"https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/portugal-municipalities.geojson"
 ).then(r=>r.json());
 
 geoLayer = L.geoJSON(geo,{
