@@ -5,15 +5,18 @@
 <title>Mapa de Risco de Incêndio em Portugal</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
-body{margin:0;font-family:Arial, Helvetica, sans-serif;}
-header{background:#b30000;color:white;text-align:center;padding:15px;font-size:24px;font-weight:bold;}
-#controls{padding:10px;text-align:center;background:#f4f4f4;border-bottom:1px solid #ccc;}
-#map{height:85vh;}
-.legenda{background:white;padding:10px;line-height:18px;box-shadow:0 0 5px rgba(0,0,0,0.4);}
+body {margin:0; font-family:Arial, Helvetica, sans-serif;}
+header {background:#b30000; color:white; text-align:center; padding:15px; font-size:24px; font-weight:bold;}
+#controls {padding:10px; text-align:center; background:#f4f4f4; border-bottom:1px solid #ccc;}
+#map {height:85vh; width:100%;}
+.legenda {background:white; padding:10px; line-height:18px; box-shadow:0 0 5px rgba(0,0,0,0.4);}
+@media(max-width:600px){header {font-size:18px;} #controls {font-size:14px;}}
 </style>
 </head>
 <body>
+
 <header>Mapa de Risco de Incêndio em Portugal</header>
+
 <div id="controls">
 Dia:
 <select id="dia">
@@ -21,6 +24,7 @@ Dia:
 <option value="1">Amanhã</option>
 </select>
 </div>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -54,6 +58,11 @@ async function carregarConcelhos(){
   concelhos = await res.json();
 }
 
+// normalizar nomes para comparação (remove acentos, lowercase)
+function normalizarNome(nome){
+  return nome.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+}
+
 // estilo do Leaflet
 function estilo(feature){
   const DICO = feature.properties.DICO;
@@ -61,19 +70,26 @@ function estilo(feature){
   return {fillColor: corRisco(risco), weight:0.6, color:"#555", fillOpacity:0.8};
 }
 
-// criar mapa GeoJSON
+// carregar mapa GeoJSON otimizado
 async function carregarMapa(){
-  const geo = await fetch('https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/portugal-municipalities.geojson').then(r=>r.json());
+  const geo = await fetch('https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/portugal-municipalities.geojson')
+    .then(r=>r.json());
+
+  // associar DICO aos polígonos pelo nome normalizado
   geo.features.forEach(f=>{
-    const conc = concelhos.find(c => c.concelho === f.properties.name);
+    const conc = concelhos.find(c => normalizarNome(c.concelho) === normalizarNome(f.properties.name));
     f.properties.DICO = conc ? conc.DICO : null;
   });
+
   geoLayer = L.geoJSON(geo,{
     style: estilo,
     onEachFeature:(feature,layer)=>{
       const DICO = feature.properties.DICO;
       const risco = riscosIPMA[DICO];
       layer.bindTooltip(feature.properties.name + "<br>Risco: " + nomeRisco(risco));
+      // destacar concelho ao passar mouse/touch
+      layer.on('mouseover', ()=> layer.setStyle({weight:2, color:'#000'}));
+      layer.on('mouseout', ()=> layer.setStyle(estilo(feature)));
     }
   }).addTo(map);
 }
