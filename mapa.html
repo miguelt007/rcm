@@ -45,11 +45,11 @@ function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito El
 
 // Carregar riscos IPMA
 async function carregarRisco(dia){
-  const url="https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
+  const url=`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
   const res = await fetch(url);
   const data = await res.json();
   riscosIPMA = {};
-  // Usar globalIdLocal como chave
+  // usar globalIdLocal como chave
   Object.values(data.local).forEach(c => {
     riscosIPMA[c.globalIdLocal.toString()] = c.data.rcm;
   });
@@ -57,19 +57,19 @@ async function carregarRisco(dia){
 
 // Estilo do Leaflet
 function estilo(feature){
-  const DICO = feature.properties.DICO.toString(); // importante: string
+  const DICO = feature.properties.DICO.toString();
   const risco = riscosIPMA[DICO];
   return {fillColor: corRisco(risco), weight:0.6, color:"#555", fillOpacity:0.8};
 }
 
-// Carregar mapa CAOP
+// Carregar GeoJSON e pintar concelhos
 async function carregarMapa(){
   const geo = await fetch('https://raw.githubusercontent.com/nmota/caop_GeoJSON/master/geograficas/ContinenteConcelhos.geojson')
     .then(r=>r.json());
 
   geoLayer = L.geoJSON(geo,{
     style: estilo,
-    onEachFeature: (feature,layer)=>{
+    onEachFeature: (feature, layer)=>{
       const DICO = feature.properties.DICO.toString();
       const risco = riscosIPMA[DICO];
       layer.bindTooltip(feature.properties.Concelho + "<br>Risco: " + nomeRisco(risco));
@@ -79,7 +79,7 @@ async function carregarMapa(){
   }).addTo(map);
 }
 
-// Atualizar mapa
+// Atualizar mapa (dia selecionado)
 async function atualizar(dia){
   await carregarRisco(dia);
   if(geoLayer) map.removeLayer(geoLayer);
@@ -93,7 +93,9 @@ async function init(){
 init();
 
 // Listener selector
-document.getElementById("dia").addEventListener("change", e=>{ atualizar(e.target.value); });
+document.getElementById("dia").addEventListener("change", e=>{
+  atualizar(e.target.value);
+});
 
 // Legenda
 const legenda = L.control({position:"bottomright"});
