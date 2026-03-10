@@ -14,7 +14,7 @@ body{margin:0;font-family:Arial;}
 </head>
 <body>
 
-<div id="topbar">Mapa de Risco de Incêndio em Portugal (Continente)</div>
+<div id="topbar">Mapa de Risco de Incêndio em Portugal</div>
 
 <div id="controls">
 Selecionar dia:
@@ -27,10 +27,9 @@ Selecionar dia:
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 <script>
 
-const map = L.map('map').setView([39.6,-8],7);
+const map = L.map('map').setView([39.5,-8],7);
 
 // Tile escuro
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
@@ -39,74 +38,65 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
   maxZoom:19
 }).addTo(map);
 
-let geojsonData;
-let riscosIPMA = {};
 let camada;
 
-// cores do risco
-function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
-function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
-
-// carregar GeoJSON dos concelhos do continente
-async function carregarGeoJSON(){
-  const res = await fetch('ContinenteConcelhos.geojson'); // ficheiro local
-  geojsonData = await res.json();
+// cores por risco
+function corRisco(r){
+  return {
+    1:"#00cc00",
+    2:"#ffff00",
+    3:"#ff9900",
+    4:"#ff3300",
+    5:"#990000"
+  }[r] || "#999";
 }
 
-// carregar risco IPMA
-async function carregarRisco(dia){
-  const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
-  const data = await res.json();
-  riscosIPMA = {};
-  Object.values(data.local).forEach(c=>{ 
-    // só incluir DICO do continente (4 dígitos)
-    if(c.dico.length===4) riscosIPMA[c.dico] = c.data.rcm; 
-  });
+// nome do risco
+function nomeRisco(r){
+  return {
+    1:"Reduzido",
+    2:"Moderado",
+    3:"Elevado",
+    4:"Muito Elevado",
+    5:"Máximo"
+  }[r] || "Sem dados";
 }
 
-// desenhar pontos nos centroides
-function desenharMapa(){
+// carregar dados IPMA e desenhar pontos
+async function carregar(dia){
+  const url = "https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
+  const resposta = await fetch(url);
+  const dados = await resposta.json();
+
   if(camada) map.removeLayer(camada);
   camada = L.layerGroup();
 
-  geojsonData.features.forEach(f=>{
-    const DICO = f.properties.DICO;
-    const nome = f.properties.Concelho;
-    const risco = riscosIPMA[DICO] || 0;
+  Object.values(dados.local).forEach(c=>{
+    const risco = c.data.rcm;
+    const nomeConcelho = c.local; // nome do concelho direto da API
 
-    const centroide = turf.centroid(f);
-    const [lon, lat] = centroide.geometry.coordinates;
-
-    const marker = L.circleMarker([lat,lon],{
+    const marcador = L.circleMarker([c.latitude,c.longitude],{
       radius:7,
       color:corRisco(risco),
       fillColor:corRisco(risco),
       fillOpacity:0.85,
       weight:1
-    }).bindPopup(`<b>Concelho:</b> ${nome}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
+    });
 
-    marker.addTo(camada);
+    marcador.bindPopup(`<b>Concelho:</b> ${nomeConcelho}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
+
+    marcador.addTo(camada);
   });
 
   camada.addTo(map);
 }
 
-// atualizar mapa
-async function atualizar(dia){
-  await carregarRisco(dia);
-  desenharMapa();
-}
+// carregar hoje
+carregar(0);
 
-// inicialização
-async function init(){
-  await carregarGeoJSON();
-  await atualizar(0);
-}
-init();
-
-// selector Hoje/Amanhã
+// mudar dia
 document.getElementById("dia").addEventListener("change", e=>{
-  atualizar(e.target.value);
+  carregar(e.target.value);
 });
 
 // legenda
