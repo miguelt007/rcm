@@ -38,30 +38,39 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
 
 let geoLayer;
 let riscosIPMA = {};
+let nomesConcelho = {};
 
 // Cores e nomes do risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#660000"}[r] || "#cccccc"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// Carregar riscos IPMA
+// Carregar API IPMA
 async function carregarRisco(dia){
   const url=`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
   const res = await fetch(url);
   const data = await res.json();
   riscosIPMA = {};
   Object.values(data.local).forEach(c => {
-    riscosIPMA[c.globalIdLocal.toString()] = c.data.rcm;
+    riscosIPMA[c.dico] = c.data.rcm; // usar dico da API
   });
+}
+
+// Carregar concelhos.json para nomes
+async function carregarNomes(){
+  const res = await fetch('https://raw.githubusercontent.com/miguelt007/rcm/refs/heads/main/concelhos.json');
+  const data = await res.json();
+  nomesConcelho = {};
+  data.forEach(c => { nomesConcelho[c.DICO] = c.Concelho; });
 }
 
 // Estilo do Leaflet
 function estilo(feature){
-  const DICO = feature.properties.DICO.toString();
+  const DICO = feature.properties.DICO;
   const risco = riscosIPMA[DICO];
   return {fillColor: corRisco(risco), weight:0.6, color:"#555", fillOpacity:0.8};
 }
 
-// Carregar GeoJSON via jsDelivr (CORS ok)
+// Carregar GeoJSON (polígonos)
 async function carregarMapa(){
   const geo = await fetch('https://cdn.jsdelivr.net/gh/nmota/caop_GeoJSON@master/geograficas/ContinenteConcelhos.geojson')
     .then(r => r.json());
@@ -69,9 +78,10 @@ async function carregarMapa(){
   geoLayer = L.geoJSON(geo,{
     style: estilo,
     onEachFeature: (feature, layer)=>{
-      const DICO = feature.properties.DICO.toString();
+      const DICO = feature.properties.DICO;
       const risco = riscosIPMA[DICO];
-      layer.bindTooltip(feature.properties.Concelho + "<br>Risco: " + nomeRisco(risco));
+      const nome = nomesConcelho[DICO] || feature.properties.Concelho;
+      layer.bindTooltip(nome + "<br>Risco: " + nomeRisco(risco));
       layer.on('mouseover', ()=> layer.setStyle({weight:2, color:'#000'}));
       layer.on('mouseout', ()=> layer.setStyle(estilo(feature)));
     }
@@ -81,6 +91,7 @@ async function carregarMapa(){
 // Atualizar mapa
 async function atualizar(dia){
   await carregarRisco(dia);
+  await carregarNomes();
   if(geoLayer) map.removeLayer(geoLayer);
   await carregarMapa();
 }
