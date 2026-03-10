@@ -1,119 +1,174 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+
 <meta charset="utf-8">
-<title>Mapa de Risco de Incêndio em Portugal</title>
+<title>Mapa de Risco de Incêndio</title>
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
 <style>
-body{margin:0;font-family:Arial,Helvetica,sans-serif;}
-header{background:#b30000;color:white;text-align:center;padding:15px;font-size:24px;font-weight:bold;}
-#controls{padding:10px;text-align:center;background:#f4f4f4;border-bottom:1px solid #ccc;}
-#map{height:85vh;width:100%;}
-.legenda{background:white;padding:10px;line-height:18px;box-shadow:0 0 5px rgba(0,0,0,0.4);}
-@media(max-width:600px){header{font-size:18px;}#controls{font-size:14px;}}
+
+body{
+font-family: Arial;
+margin:0;
+padding:0;
+}
+
+#topbar{
+padding:10px;
+background:#f2f2f2;
+border-bottom:1px solid #ccc;
+}
+
+#map{
+height:90vh;
+width:100%;
+}
+
+.legenda{
+background:white;
+padding:10px;
+line-height:18px;
+color:#333;
+box-shadow:0 0 5px rgba(0,0,0,0.3);
+}
+
 </style>
+
 </head>
+
 <body>
 
-<header>Mapa de Risco de Incêndio em Portugal</header>
+<div id="topbar">
 
-<div id="controls">
-Dia:
+Selecionar dia:
+
 <select id="dia">
 <option value="0">Hoje</option>
 <option value="1">Amanhã</option>
 </select>
+
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
 <script>
 
-const map = L.map('map').setView([39.6,-8],7);
+const map = L.map('map').setView([39.5,-8],7);
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'© OpenStreetMap'
+attribution:'© OpenStreetMap'
 }).addTo(map);
 
-let concelhosData = [];
-let riscosIPMA = {};
-let markersLayer;
+let camada;
 
-// cores e nomes do risco
-function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#660000"}[r] || "#cccccc"; }
-function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
+// cores por risco
+function corRisco(r){
 
-// carregar concelhos local
-async function carregarConcelhos(){
-  const res = await fetch('concelhos.json');
-  concelhosData = await res.json();
+return {
+1:"#00cc00",
+2:"#ffff00",
+3:"#ff9900",
+4:"#ff3300",
+5:"#990000"
+}[r] || "#999";
+
 }
 
-// carregar riscos IPMA
-async function carregarRisco(dia){
-  const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
-  const data = await res.json();
-  riscosIPMA = {};
-  Object.values(data.local).forEach(c => { riscosIPMA[c.dico] = c.data.rcm; });
+// nome do risco
+function nomeRisco(r){
+
+return {
+1:"Reduzido",
+2:"Moderado",
+3:"Elevado",
+4:"Muito Elevado",
+5:"Máximo"
+}[r];
+
 }
 
-// desenhar pontos
-function desenharMapa(){
-  if(markersLayer) map.removeLayer(markersLayer);
-  markersLayer = L.layerGroup();
+async function carregar(dia){
 
-  concelhosData.forEach(c=>{
-    const lat = parseFloat(c.latitude);
-    const lon = parseFloat(c.longitude);
-    if(!isNaN(lat) && !isNaN(lon)){
-      const risco = riscosIPMA[c.DICO] || 0;
-      const marker = L.circleMarker([lat, lon], {
-        radius: 8,
-        fillColor: corRisco(risco),
-        color: "#555",
-        weight: 1,
-        fillOpacity: 0.8
-      }).bindTooltip(`${c.Concelho}<br>Risco: ${nomeRisco(risco)}`);
-      markersLayer.addLayer(marker);
-    }
-  });
+const url = "https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
 
-  markersLayer.addTo(map);
+const resposta = await fetch(url);
+
+const dados = await resposta.json();
+
+if(camada) map.removeLayer(camada);
+
+camada = L.layerGroup();
+
+Object.values(dados.local).forEach(c=>{
+
+const risco = c.data.rcm;
+
+const marcador = L.circleMarker(
+
+[c.latitude,c.longitude],
+{
+radius:7,
+color:corRisco(risco),
+fillColor:corRisco(risco),
+fillOpacity:0.85,
+weight:1
 }
 
-// atualizar mapa
-async function atualizar(dia){
-  await carregarRisco(dia);
-  desenharMapa();
-}
+);
 
-// inicialização
-async function init(){
-  await carregarConcelhos();
-  await atualizar(0);
-}
-init();
+marcador.bindPopup(
 
-// selector Hoje/Amanhã
-document.getElementById("dia").addEventListener("change", e=>{
-  atualizar(e.target.value);
+"<b>Concelho:</b> "+c.local+"<br>"+
+"<b>Risco:</b> "+nomeRisco(risco)
+
+);
+
+marcador.addTo(camada);
+
 });
 
+camada.addTo(map);
+
+}
+
+// carregar hoje
+carregar(0);
+
+// mudar dia
+document.getElementById("dia").addEventListener("change",e=>{
+
+carregar(e.target.value);
+
+});
+
+
 // legenda
-const legenda = L.control({position:"bottomright"});
+
+const legenda = L.control({position:'bottomright'});
+
 legenda.onAdd = function(){
-  const div = L.DomUtil.create("div","legenda");
-  div.innerHTML =
-    "<b>Risco de Incêndio</b><br>"+
-    "<i style='background:#00cc00;width:12px;height:12px;display:inline-block'></i> Reduzido<br>"+
-    "<i style='background:#ffff00;width:12px;height:12px;display:inline-block'></i> Moderado<br>"+
-    "<i style='background:#ff9900;width:12px;height:12px;display:inline-block'></i> Elevado<br>"+
-    "<i style='background:#ff3300;width:12px;height:12px;display:inline-block'></i> Muito Elevado<br>"+
-    "<i style='background:#660000;width:12px;height:12px;display:inline-block'></i> Máximo";
-  return div;
+
+const div = L.DomUtil.create('div','legenda');
+
+div.innerHTML =
+"<b>Risco de Incêndio</b><br>"+
+"<i style='background:#00cc00;width:12px;height:12px;display:inline-block'></i> Reduzido<br>"+
+"<i style='background:#ffff00;width:12px;height:12px;display:inline-block'></i> Moderado<br>"+
+"<i style='background:#ff9900;width:12px;height:12px;display:inline-block'></i> Elevado<br>"+
+"<i style='background:#ff3300;width:12px;height:12px;display:inline-block'></i> Muito Elevado<br>"+
+"<i style='background:#990000;width:12px;height:12px;display:inline-block'></i> Máximo";
+
+return div;
+
 };
+
 legenda.addTo(map);
 
 </script>
+
 </body>
 </html>
