@@ -57,7 +57,6 @@ Selecionar dia:
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-
 const map = L.map('map').setView([39.5,-8],7);
 
 // Tile escuro
@@ -68,6 +67,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
 }).addTo(map);
 
 let camada;
+let concelhos = {}; // para mapear DICO → Nome do concelho
 
 // cores por risco
 function corRisco(r){
@@ -88,7 +88,13 @@ function nomeRisco(r){
     3:"Elevado",
     4:"Muito Elevado",
     5:"Máximo"
-  }[r];
+  }[r] || "Sem dados";
+}
+
+// carregar concelhos.json local
+async function carregarConcelhos(){
+  const res = await fetch('concelhos.json');
+  concelhos = await res.json();
 }
 
 // carregar dados IPMA e desenhar pontos
@@ -102,6 +108,8 @@ async function carregar(dia){
 
   Object.values(dados.local).forEach(c=>{
     const risco = c.data.rcm;
+    const nomeConcelho = concelhos[c.dico] || "Sem nome";
+
     const marcador = L.circleMarker([c.latitude,c.longitude],{
       radius:7,
       color:corRisco(risco),
@@ -111,16 +119,19 @@ async function carregar(dia){
     });
 
     // popup com nome do concelho + alerta
-    marcador.bindPopup("<b>Concelho:</b> "+c.local+"<br><b>Alerta:</b> "+nomeRisco(risco));
-
+    marcador.bindPopup("<b>Concelho:</b> "+nomeConcelho+"<br><b>Alerta:</b> "+nomeRisco(risco));
     marcador.addTo(camada);
   });
 
   camada.addTo(map);
 }
 
-// carregar hoje
-carregar(0);
+// inicialização
+async function init(){
+  await carregarConcelhos();
+  await carregar(0);
+}
+init();
 
 // mudar dia
 document.getElementById("dia").addEventListener("change", e=>{
