@@ -28,7 +28,6 @@ Dia:
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
 <script>
 
 const map = L.map('map').setView([39.6,-8],7);
@@ -36,21 +35,21 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap'
 }).addTo(map);
 
-let geojsonData = null;
+let geojsonLayer;
+let geojsonData;
 let riscosIPMA = {};
-let markersLayer;
 
 // cores do risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#660000"}[r] || "#cccccc"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar GeoJSON do CAOP (simplificado se necessário)
+// carregar GeoJSON local
 async function carregarGeoJSON(){
-  const res = await fetch('ContinenteConcelhos.geojson'); // coloca este ficheiro na mesma pasta
+  const res = await fetch('ContinenteConcelhos.geojson');
   geojsonData = await res.json();
 }
 
-// carregar API IPMA
+// carregar riscos IPMA
 async function carregarRisco(dia){
   const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
   const data = await res.json();
@@ -58,30 +57,32 @@ async function carregarRisco(dia){
   Object.values(data.local).forEach(c => { riscosIPMA[c.dico] = c.data.rcm; });
 }
 
-// calcular centroide e desenhar pontos
+// estilizar polígonos
+function styleFeature(feature){
+  const DICO = feature.properties.DICO;
+  const risco = riscosIPMA[DICO] || 0;
+  return {
+    fillColor: corRisco(risco),
+    weight: 1,
+    opacity: 1,
+    color: "#555",
+    fillOpacity: 0.7
+  };
+}
+
+// desenhar o GeoJSON no mapa
 function desenharMapa(){
-  if(markersLayer) map.removeLayer(markersLayer);
-  markersLayer = L.layerGroup();
+  if(geojsonLayer) map.removeLayer(geojsonLayer);
 
-  geojsonData.features.forEach(f => {
-    const DICO = f.properties.DICO;
-    const nome = f.properties.Concelho;
-    const centroide = turf.centroid(f); // usa turf para o centro
-    const [lon, lat] = centroide.geometry.coordinates;
-    const risco = riscosIPMA[DICO] || 0;
-
-    const marker = L.circleMarker([lat, lon], {
-      radius: 8,
-      fillColor: corRisco(risco),
-      color: "#555",
-      weight: 1,
-      fillOpacity: 0.9
-    }).bindTooltip(`${nome}<br>Risco: ${nomeRisco(risco)}`);
-
-    markersLayer.addLayer(marker);
-  });
-
-  markersLayer.addTo(map);
+  geojsonLayer = L.geoJSON(geojsonData,{
+    style: styleFeature,
+    onEachFeature: function(feature, layer){
+      const DICO = feature.properties.DICO;
+      const nome = feature.properties.Concelho;
+      const risco = riscosIPMA[DICO] || 0;
+      layer.bindTooltip(`${nome}<br>Risco: ${nomeRisco(risco)}`);
+    }
+  }).addTo(map);
 }
 
 // atualizar mapa
