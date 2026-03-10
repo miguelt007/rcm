@@ -49,12 +49,15 @@ async function carregarRisco(dia){
   const res = await fetch(url);
   const data = await res.json();
   riscosIPMA = {};
-  Object.values(data.local).forEach(c=>{ riscosIPMA[c.DICO] = c.data.rcm; });
+  // usar globalIdLocal em vez de DICO
+  Object.values(data.local).forEach(c => {
+    riscosIPMA[c.globalIdLocal.toString()] = c.data.rcm;
+  });
 }
 
 // estilo do Leaflet
 function estilo(feature){
-  const DICO = feature.properties.DICO; // usar DICO do próprio GeoJSON
+  const DICO = feature.properties.DICO;
   const risco = riscosIPMA[DICO];
   return {fillColor: corRisco(risco), weight:0.6, color:"#555", fillOpacity:0.8};
 }
