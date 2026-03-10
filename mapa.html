@@ -39,17 +39,17 @@ let concelhosData = [];
 let riscosIPMA = {};
 let markersLayer;
 
-// cores do risco
+// cores e nomes do risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#660000"}[r] || "#cccccc"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar concelhos.json
+// carregar concelhos local
 async function carregarConcelhos(){
-  const res = await fetch('https://raw.githubusercontent.com/miguelt007/rcm/refs/heads/main/concelhos.json');
+  const res = await fetch('concelhos.json');
   concelhosData = await res.json();
 }
 
-// carregar API IPMA
+// carregar riscos IPMA
 async function carregarRisco(dia){
   const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
   const data = await res.json();
@@ -62,7 +62,7 @@ function desenharMapa(){
   if(markersLayer) map.removeLayer(markersLayer);
   markersLayer = L.layerGroup();
 
-  concelhosData.forEach(c => {
+  concelhosData.forEach(c=>{
     const lat = parseFloat(c.latitude);
     const lon = parseFloat(c.longitude);
     if(!isNaN(lat) && !isNaN(lon)){
