@@ -46,9 +46,9 @@ let riscosIPMA = {};
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar GeoJSON
+// carregar GeoJSON local
 async function carregarGeoJSON(){
-  const res = await fetch('ContinenteConcelhos.geojson');
+  const res = await fetch('ContinenteConcelhos.geojson'); // deve estar na mesma pasta
   geojsonData = await res.json();
 }
 
@@ -64,7 +64,7 @@ async function carregarRisco(dia){
   });
 }
 
-// desenhar pontos nos centroides
+// desenhar pontos no centro do concelho
 function desenharMapa(){
   if(camada) map.removeLayer(camada);
   camada = L.layerGroup();
