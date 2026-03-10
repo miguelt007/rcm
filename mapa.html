@@ -31,6 +31,7 @@ Dia:
 <script>
 
 const map = L.map('map').setView([39.6,-8],7);
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap'
 }).addTo(map);
@@ -58,6 +59,11 @@ async function carregarConcelhos(){
   concelhos = await res.json();
 }
 
+// normalizar nomes
+function normalizarNome(nome){
+  return nome.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+}
+
 // estilo do Leaflet
 function estilo(feature){
   const DICO = feature.properties.DICO;
@@ -65,20 +71,15 @@ function estilo(feature){
   return {fillColor: corRisco(risco), weight:0.6, color:"#555", fillOpacity:0.8};
 }
 
-// normalizar nomes
-function normalizarNome(nome){
-  return nome.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
-}
-
 // carregar mapa CAOP
 async function carregarMapa(){
   const geo = await fetch('https://raw.githubusercontent.com/nmota/caop_GeoJSON/master/geograficas/ContinenteConcelhos.geojson')
     .then(r=>r.json());
 
-  // ligar polígonos aos DICO
+  // garantir DICO do GeoJSON
   geo.features.forEach(f=>{
-    const conc = concelhos.find(c => normalizarNome(c.concelho) === normalizarNome(f.properties.Concelho));
-    f.properties.DICO = conc ? conc.DICO : null;
+    // DICO já existe no GeoJSON, mas se quiseres podemos cruzar com concelhos.json
+    f.properties.DICO = f.properties.DICO || null;
   });
 
   geoLayer = L.geoJSON(geo,{
