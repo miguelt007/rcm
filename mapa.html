@@ -42,47 +42,40 @@ let geojsonData;
 let camada;
 let riscosIPMA = {};
 
-// cores por risco
+// cores e nomes de risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar GeoJSON do CAOP (Continente)
+// carregar GeoJSON
 async function carregarGeoJSON(){
-  const res = await fetch('ContinenteConcelhos.geojson'); // ficheiro local ou raw GitHub
+  const res = await fetch('ContinenteConcelhos.geojson');
   geojsonData = await res.json();
 }
 
-// carregar dados IPMA
+// carregar risco IPMA
 async function carregarRisco(dia){
   const url = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
   const res = await fetch(url);
   const data = await res.json();
+
   riscosIPMA = {};
   Object.values(data.local).forEach(c=>{
-    riscosIPMA[`${c.longitude},${c.latitude}`] = c.data.rcm; // armazenar risco pelo ponto
+    if(c.dico.length===4) riscosIPMA[c.dico] = c.data.rcm;
   });
 }
 
-// desenhar pontos com nome correto
+// desenhar pontos nos centroides
 function desenharMapa(){
   if(camada) map.removeLayer(camada);
   camada = L.layerGroup();
 
-  // para cada ponto da API
-  Object.keys(riscosIPMA).forEach(coord=>{
-    const [lon, lat] = coord.split(',').map(Number);
-    const ponto = turf.point([lon, lat]);
-    let nomeConcelho = "Sem nome";
+  geojsonData.features.forEach(f=>{
+    const DICO = f.properties.DICO;
+    const nome = f.properties.Concelho;
+    const risco = riscosIPMA[DICO] || 0;
 
-    // verificar em qual polígono cai
-    for(const f of geojsonData.features){
-      if(turf.booleanPointInPolygon(ponto, f)){
-        nomeConcelho = f.properties.Concelho; // nome oficial do CAOP
-        break;
-      }
-    }
-
-    const risco = riscosIPMA[coord];
+    const centroide = turf.centroid(f);
+    const [lon, lat] = centroide.geometry.coordinates;
 
     const marker = L.circleMarker([lat,lon],{
       radius:7,
@@ -92,8 +85,8 @@ function desenharMapa(){
       weight:1
     });
 
-    marker.bindTooltip(`<b>${nomeConcelho}</b><br>Alerta: ${nomeRisco(risco)}`, {sticky:true});
-    marker.bindPopup(`<b>Concelho:</b> ${nomeConcelho}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
+    marker.bindTooltip(`<b>${nome}</b><br>Alerta: ${nomeRisco(risco)}`, {sticky:true});
+    marker.bindPopup(`<b>Concelho:</b> ${nome}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
 
     marker.addTo(camada);
   });
