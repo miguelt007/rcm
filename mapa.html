@@ -30,6 +30,7 @@ Dia:
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 
+// inicializar mapa
 const map = L.map('map').setView([39.6,-8],7);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap'
@@ -75,10 +76,14 @@ async function carregarMapa(){
   const geo = await fetch('https://raw.githubusercontent.com/nmota/caop_GeoJSON/master/geograficas/ContinenteConcelhos.geojson')
     .then(r=>r.json());
 
+  // criar mapa de correspondência nome → DICO
+  const mapNomeParaDICO = {};
+  concelhos.forEach(c => mapNomeParaDICO[normalizarNome(c.concelho)] = c.DICO);
+
+  // atribuir DICO correto a cada polígono
   geo.features.forEach(f=>{
-    // ligar cada polígono ao DICO correto usando concelhos.json
-    const conc = concelhos.find(c => normalizarNome(c.concelho) === normalizarNome(f.properties.Concelho));
-    f.properties.DICO = conc ? conc.DICO : null;
+    const nomeNorm = normalizarNome(f.properties.Concelho);
+    f.properties.DICO = mapNomeParaDICO[nomeNorm] || null;
   });
 
   geoLayer = L.geoJSON(geo,{
@@ -87,7 +92,6 @@ async function carregarMapa(){
       const DICO = feature.properties.DICO;
       const risco = riscosIPMA[DICO];
       layer.bindTooltip(feature.properties.Concelho + "<br>Risco: " + nomeRisco(risco));
-      // destacar ao hover
       layer.on('mouseover', ()=> layer.setStyle({weight:2, color:'#000'}));
       layer.on('mouseout', ()=> layer.setStyle(estilo(feature)));
     }
