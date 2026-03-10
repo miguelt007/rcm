@@ -44,7 +44,7 @@ let dados = [];
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// carregar dados
+// carregar todos os dados
 Promise.all([
   fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json').then(r => r.json()),
   fetch('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d1.json').then(r => r.json()),
@@ -54,21 +54,20 @@ Promise.all([
   const locaisHoje = hoje.local;
   const locaisAmanha = amanha.local;
 
-  for (const id in locaisHoje) {
+  dados = Object.keys(locaisHoje).map(id => {
     const h = locaisHoje[id];
     const a = locaisAmanha[id];
-    if (!h || !a) continue;
-
-    dados.push({
+    if(!h || !a) return null;
+    return {
       lat: h.latitude,
       lon: h.longitude,
       rcmHoje: h.data.rcm,
       rcmAmanha: a.data.rcm,
       nomeConcelho: mapaConcelhos[id] || id
-    });
-  }
+    };
+  }).filter(d => d !== null);
 
-  desenharPontos(0); // carregar hoje
+  desenharPontos(0);
 });
 
 // desenhar pontos
@@ -115,7 +114,6 @@ legenda.onAdd = function(){
   return div;
 };
 legenda.addTo(map);
-
 </script>
 </body>
 </html>
