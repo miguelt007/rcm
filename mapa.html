@@ -9,40 +9,39 @@
 
 <style>
 body{
-margin:0;
-font-family:Arial, Helvetica, sans-serif;
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
 }
 
 header{
-background:#b30000;
-color:white;
-text-align:center;
-padding:15px;
-font-size:24px;
-font-weight:bold;
+  background:#b30000;
+  color:white;
+  text-align:center;
+  padding:15px;
+  font-size:24px;
+  font-weight:bold;
 }
 
 #controls{
-padding:10px;
-text-align:center;
-background:#f4f4f4;
-border-bottom:1px solid #ccc;
+  padding:10px;
+  text-align:center;
+  background:#f4f4f4;
+  border-bottom:1px solid #ccc;
 }
 
 #map{
-height:85vh;
+  height:85vh;
 }
 
 .legenda{
-background:white;
-padding:10px;
-line-height:18px;
-box-shadow:0 0 5px rgba(0,0,0,0.4);
+  background:white;
+  padding:10px;
+  line-height:18px;
+  box-shadow:0 0 5px rgba(0,0,0,0.4);
 }
 </style>
 
 </head>
-
 <body>
 
 <header>
@@ -62,10 +61,8 @@ Dia:
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-
 const map = L.map('map').setView([39.6,-8],7);
 
-// mapa base
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap'
 }).addTo(map);
@@ -113,7 +110,7 @@ async function carregarConcelhos(){
   concelhos = await res.json();
 }
 
-// função de estilo para o Leaflet
+// estilo do Leaflet por risco
 function estilo(feature){
   const DICO = feature.properties.DICO;
   const risco = riscosIPMA[DICO];
@@ -125,12 +122,12 @@ function estilo(feature){
   };
 }
 
-// criar o mapa
+// carregar mapa GeoJSON otimizado
 async function carregarMapa(){
   const geo = await fetch('https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/portugal-municipalities.geojson')
     .then(r=>r.json());
 
-  // adicionar DICO aos polígonos
+  // associar DICO aos polígonos pelo nome
   geo.features.forEach(f=>{
     const conc = concelhos.find(c => c.concelho === f.properties.name);
     f.properties.DICO = conc ? conc.DICO : null;
