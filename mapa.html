@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="utf-8">
-<title>Mapa de Risco de Incêndio em Portugal</title>
+<title>Mapa de Risco de Incêndio Simplificado</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
 body{margin:0;font-family:Arial,Helvetica,sans-serif;}
@@ -39,73 +39,67 @@ let geoLayer;
 let riscosIPMA = {};
 let nomesConcelho = {};
 
-// Cores e nomes do risco
+// cores do risco
 function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#660000"}[r] || "#cccccc"; }
 function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
 
-// Carregar API IPMA
-async function carregarRisco(dia){
-  const url=`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
-  const res = await fetch(url);
+// carregar concelhos.json
+async function carregarConcelhos(){
+  const res = await fetch('/concelhos.json'); // deve estar local ou no backend
   const data = await res.json();
-  riscosIPMA = {};
-  Object.values(data.local).forEach(c => {
-    riscosIPMA[c.dico] = c.data.rcm;
-  });
-}
-
-// Carregar concelhos.json para nomes
-async function carregarNomes(){
-  const res = await fetch('/concelhos.json'); // deve estar na pasta public do backend
-  const data = await res.json();
-  nomesConcelho = {};
   data.forEach(c => { nomesConcelho[c.DICO] = c.Concelho; });
 }
 
-// Estilo do Leaflet
-function estilo(feature){
-  const DICO = feature.properties.DICO;
-  const risco = riscosIPMA[DICO];
-  return {fillColor: corRisco(risco), weight:0.6, color:"#555", fillOpacity:0.8};
+// carregar API IPMA
+async function carregarRisco(dia){
+  const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
+  const data = await res.json();
+  riscosIPMA = {};
+  Object.values(data.local).forEach(c => { riscosIPMA[c.dico] = c.data.rcm; });
 }
 
-// Carregar GeoJSON local via backend
-async function carregarMapa(){
-  const geo = await fetch('/geojson').then(r => r.json());
+// estilo do Leaflet
+function estilo(feature){
+  const DICO = feature.properties.DICO;
+  return {fillColor: corRisco(riscosIPMA[DICO]), weight:0.6, color:"#555", fillOpacity:0.8};
+}
 
+// carregar GeoJSON simplificado
+async function carregarMapa(){
+  const geo = await fetch('/geojson-simplificado.json').then(r=>r.json()); // geojson simplificado
   geoLayer = L.geoJSON(geo,{
     style: estilo,
     onEachFeature: (feature, layer)=>{
       const DICO = feature.properties.DICO;
-      const risco = riscosIPMA[DICO];
       const nome = nomesConcelho[DICO] || feature.properties.Concelho;
-      layer.bindTooltip(nome + "<br>Risco: " + nomeRisco(risco));
+      const risco = riscosIPMA[DICO];
+      layer.bindTooltip(`${nome}<br>Risco: ${nomeRisco(risco)}`);
       layer.on('mouseover', ()=> layer.setStyle({weight:2, color:'#000'}));
       layer.on('mouseout', ()=> layer.setStyle(estilo(feature)));
     }
   }).addTo(map);
 }
 
-// Atualizar mapa
+// atualizar mapa
 async function atualizar(dia){
   await carregarRisco(dia);
-  await carregarNomes();
   if(geoLayer) map.removeLayer(geoLayer);
   await carregarMapa();
 }
 
-// Inicialização
+// inicialização
 async function init(){
+  await carregarConcelhos();
   await atualizar(0);
 }
 init();
 
-// Selector Hoje/Amanhã
+// selector Hoje/Amanhã
 document.getElementById("dia").addEventListener("change", e=>{
   atualizar(e.target.value);
 });
 
-// Legenda
+// legenda
 const legenda = L.control({position:"bottomright"});
 legenda.onAdd = function(){
   const div = L.DomUtil.create("div","legenda");
