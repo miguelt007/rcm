@@ -21,6 +21,7 @@ color:white;
 padding:10px;
 background:#222;
 border-bottom:1px solid #444;
+font-size:18px;
 }
 
 #map{
@@ -50,7 +51,7 @@ box-shadow:0 0 5px rgba(0,0,0,0.4);
 
 <div id="topbar">
 
-Mapa de Risco de Incêndio (IPMA)
+<b>Mapa de Risco de Incêndio (IPMA)</b>
 
 <select id="dia">
 <option value="0">Hoje</option>
@@ -74,7 +75,6 @@ attribution:'© OpenStreetMap'
 let camada;
 let riscoPorDico = {};
 
-// cores por risco
 function corRisco(r){
 
 return {
@@ -87,7 +87,6 @@ return {
 
 }
 
-// nome do risco
 function nomeRisco(r){
 
 return {
@@ -105,7 +104,6 @@ async function carregar(dia){
 const url = "https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
 
 const resposta = await fetch(url);
-
 const dados = await resposta.json();
 
 riscoPorDico = {};
@@ -125,14 +123,13 @@ camada = L.geoJSON(concelhos,{
 
 style:function(feature){
 
-const dico = feature.properties.DICO;
-const risco = riscoPorDico[dico];
+const risco = riscoPorDico[feature.properties.DICO];
 
 return{
 color:"#444",
 weight:1,
 fillColor:corRisco(risco),
-fillOpacity:0.7
+fillOpacity:0.75
 };
 
 },
@@ -140,15 +137,38 @@ fillOpacity:0.7
 onEachFeature:function(feature,layer){
 
 const nome = feature.properties.Concelho;
-const dico = feature.properties.DICO;
-const risco = riscoPorDico[dico];
+const risco = riscoPorDico[feature.properties.DICO];
 
 layer.bindPopup(
-
 "<b>"+nome+"</b><br>"+
 "<b>Risco:</b> "+nomeRisco(risco)
-
 );
+
+layer.on({
+
+mouseover:function(e){
+
+const l = e.target;
+
+l.setStyle({
+weight:3,
+color:"#fff"
+});
+
+l.openPopup();
+
+},
+
+mouseout:function(e){
+
+camada.resetStyle(e.target);
+
+l = e.target;
+l.closePopup();
+
+}
+
+});
 
 }
 
@@ -158,18 +178,13 @@ camada.addTo(map);
 
 }
 
-// carregar hoje
 carregar(0);
 
-// mudar dia
 document.getElementById("dia").addEventListener("change",e=>{
 
 carregar(e.target.value);
 
 });
-
-
-// legenda
 
 const legenda = L.control({position:'bottomright'});
 
