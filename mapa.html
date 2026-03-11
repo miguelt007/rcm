@@ -13,26 +13,33 @@ body{
 font-family:Arial;
 margin:0;
 padding:0;
+background:#111;
+color:white;
 }
 
 #topbar{
 padding:10px;
 background:#222;
-color:white;
-font-size:20px;
-text-align:center;
+border-bottom:1px solid #444;
 }
 
 #map{
-height:92vh;
+height:90vh;
 width:100%;
+}
+
+select{
+padding:5px;
+font-size:16px;
+margin-left:10px;
 }
 
 .legenda{
 background:white;
 padding:10px;
 line-height:18px;
-box-shadow:0 0 5px rgba(0,0,0,0.3);
+color:#333;
+box-shadow:0 0 5px rgba(0,0,0,0.4);
 }
 
 </style>
@@ -42,7 +49,14 @@ box-shadow:0 0 5px rgba(0,0,0,0.3);
 <body>
 
 <div id="topbar">
+
 Mapa de Risco de Incêndio (IPMA)
+
+<select id="dia">
+<option value="0">Hoje</option>
+<option value="1">Amanhã</option>
+</select>
+
 </div>
 
 <div id="map"></div>
@@ -53,13 +67,14 @@ Mapa de Risco de Incêndio (IPMA)
 
 const map = L.map('map').setView([39.5,-8],7);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
 attribution:'© OpenStreetMap'
 }).addTo(map);
 
+let camada;
 let riscoPorDico = {};
 
-// cores do risco
+// cores por risco
 function corRisco(r){
 
 return {
@@ -81,29 +96,32 @@ return {
 3:"Elevado",
 4:"Muito Elevado",
 5:"Máximo"
-}[r];
+}[r] || "Sem dados";
 
 }
 
-async function carregar(){
+async function carregar(dia){
 
-// API IPMA
-const resposta = await fetch("https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json");
+const url = "https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
+
+const resposta = await fetch(url);
 
 const dados = await resposta.json();
 
-// criar tabela DICO -> risco
-Object.values(dados.local).forEach(c => {
+riscoPorDico = {};
+
+Object.values(dados.local).forEach(c=>{
 
 riscoPorDico[c.dico] = c.data.rcm;
 
 });
 
-// carregar concelhos
+if(camada) map.removeLayer(camada);
+
 const geo = await fetch("concelhos.geojson");
 const concelhos = await geo.json();
 
-L.geoJSON(concelhos,{
+camada = L.geoJSON(concelhos,{
 
 style:function(feature){
 
@@ -111,12 +129,10 @@ const dico = feature.properties.DICO;
 const risco = riscoPorDico[dico];
 
 return{
-
-color:"#333",
+color:"#444",
 weight:1,
 fillColor:corRisco(risco),
 fillOpacity:0.7
-
 };
 
 },
@@ -130,17 +146,27 @@ const risco = riscoPorDico[dico];
 layer.bindPopup(
 
 "<b>"+nome+"</b><br>"+
-"Risco: "+nomeRisco(risco)
+"<b>Risco:</b> "+nomeRisco(risco)
 
 );
 
 }
 
-}).addTo(map);
+});
+
+camada.addTo(map);
 
 }
 
-carregar();
+// carregar hoje
+carregar(0);
+
+// mudar dia
+document.getElementById("dia").addEventListener("change",e=>{
+
+carregar(e.target.value);
+
+});
 
 
 // legenda
