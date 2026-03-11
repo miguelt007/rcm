@@ -3,6 +3,8 @@
 <head>
 
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Mapa de Risco de Incêndio</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
@@ -12,27 +14,41 @@
 body{
 font-family:Arial;
 margin:0;
-padding:0;
 background:#111;
 color:white;
 }
 
 #topbar{
-padding:10px;
 background:#222;
+padding:10px;
+text-align:center;
 border-bottom:1px solid #444;
-font-size:18px;
 }
 
-#map{
-height:90vh;
-width:100%;
+#titulo{
+font-size:22px;
+font-weight:bold;
+margin-bottom:5px;
+}
+
+#data{
+font-size:14px;
+color:#bbb;
+margin-bottom:8px;
+}
+
+#filtro{
+margin-top:5px;
 }
 
 select{
-padding:5px;
+padding:6px;
 font-size:16px;
-margin-left:10px;
+}
+
+#map{
+height:88vh;
+width:100%;
 }
 
 .legenda{
@@ -40,7 +56,25 @@ background:white;
 padding:10px;
 line-height:18px;
 color:#333;
-box-shadow:0 0 5px rgba(0,0,0,0.4);
+box-shadow:0 0 6px rgba(0,0,0,0.4);
+}
+
+/* mobile */
+
+@media (max-width:600px){
+
+#titulo{
+font-size:18px;
+}
+
+select{
+font-size:14px;
+}
+
+#map{
+height:85vh;
+}
+
 }
 
 </style>
@@ -51,12 +85,24 @@ box-shadow:0 0 5px rgba(0,0,0,0.4);
 
 <div id="topbar">
 
-<b>Mapa de Risco de Incêndio (IPMA)</b>
+<div id="titulo">
+Mapa de Risco de Incêndio
+</div>
+
+<div id="data">
+A carregar...
+</div>
+
+<div id="filtro">
+
+Selecionar dia:
 
 <select id="dia">
 <option value="0">Hoje</option>
 <option value="1">Amanhã</option>
 </select>
+
+</div>
 
 </div>
 
@@ -101,29 +147,32 @@ return {
 
 async function carregar(dia){
 
-const url = "https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
+const url="https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
 
-const resposta = await fetch(url);
-const dados = await resposta.json();
+const resposta=await fetch(url);
+const dados=await resposta.json();
 
-riscoPorDico = {};
+document.getElementById("data").innerHTML =
+"Relatório IPMA: "+dados.fileDate;
+
+riscoPorDico={};
 
 Object.values(dados.local).forEach(c=>{
 
-riscoPorDico[c.dico] = c.data.rcm;
+riscoPorDico[c.dico]=c.data.rcm;
 
 });
 
 if(camada) map.removeLayer(camada);
 
-const geo = await fetch("concelhos.geojson");
-const concelhos = await geo.json();
+const geo=await fetch("concelhos.geojson");
+const concelhos=await geo.json();
 
-camada = L.geoJSON(concelhos,{
+camada=L.geoJSON(concelhos,{
 
 style:function(feature){
 
-const risco = riscoPorDico[feature.properties.DICO];
+const risco=riscoPorDico[feature.properties.DICO];
 
 return{
 color:"#444",
@@ -136,19 +185,21 @@ fillOpacity:0.75
 
 onEachFeature:function(feature,layer){
 
-const nome = feature.properties.Concelho;
-const risco = riscoPorDico[feature.properties.DICO];
+const nome=feature.properties.Concelho;
+const risco=riscoPorDico[feature.properties.DICO];
 
 layer.bindPopup(
+
 "<b>"+nome+"</b><br>"+
-"<b>Risco:</b> "+nomeRisco(risco)
+"Risco: "+nomeRisco(risco)
+
 );
 
 layer.on({
 
 mouseover:function(e){
 
-const l = e.target;
+const l=e.target;
 
 l.setStyle({
 weight:3,
@@ -162,9 +213,7 @@ l.openPopup();
 mouseout:function(e){
 
 camada.resetStyle(e.target);
-
-l = e.target;
-l.closePopup();
+e.target.closePopup();
 
 }
 
@@ -186,13 +235,13 @@ carregar(e.target.value);
 
 });
 
-const legenda = L.control({position:'bottomright'});
+const legenda=L.control({position:'bottomright'});
 
-legenda.onAdd = function(){
+legenda.onAdd=function(){
 
-const div = L.DomUtil.create('div','legenda');
+const div=L.DomUtil.create('div','legenda');
 
-div.innerHTML =
+div.innerHTML=
 "<b>Risco de Incêndio</b><br>"+
 "<i style='background:#00cc00;width:12px;height:12px;display:inline-block'></i> Reduzido<br>"+
 "<i style='background:#ffff00;width:12px;height:12px;display:inline-block'></i> Moderado<br>"+
