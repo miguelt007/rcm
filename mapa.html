@@ -20,7 +20,7 @@ color:white;
 
 #topbar{
 background:#222;
-padding:10px;
+padding:12px;
 text-align:center;
 border-bottom:1px solid #444;
 }
@@ -28,17 +28,21 @@ border-bottom:1px solid #444;
 #titulo{
 font-size:22px;
 font-weight:bold;
-margin-bottom:5px;
 }
 
 #data{
 font-size:14px;
 color:#bbb;
-margin-bottom:8px;
+margin-top:4px;
+}
+
+#stats{
+margin-top:8px;
+font-size:14px;
 }
 
 #filtro{
-margin-top:5px;
+margin-top:10px;
 }
 
 select{
@@ -47,7 +51,7 @@ font-size:16px;
 }
 
 #map{
-height:88vh;
+height:85vh;
 width:100%;
 }
 
@@ -59,12 +63,14 @@ color:#333;
 box-shadow:0 0 6px rgba(0,0,0,0.4);
 }
 
-/* mobile */
-
 @media (max-width:600px){
 
 #titulo{
 font-size:18px;
+}
+
+#stats{
+font-size:13px;
 }
 
 select{
@@ -72,7 +78,7 @@ font-size:14px;
 }
 
 #map{
-height:85vh;
+height:82vh;
 }
 
 }
@@ -89,9 +95,9 @@ height:85vh;
 Mapa de Risco de Incêndio
 </div>
 
-<div id="data">
-A carregar...
-</div>
+<div id="data"></div>
+
+<div id="stats"></div>
 
 <div id="filtro">
 
@@ -119,7 +125,7 @@ attribution:'© OpenStreetMap'
 }).addTo(map);
 
 let camada;
-let riscoPorDico = {};
+let riscoPorDico={};
 
 function corRisco(r){
 
@@ -157,11 +163,29 @@ document.getElementById("data").innerHTML =
 
 riscoPorDico={};
 
+let contagem={
+1:0,2:0,3:0,4:0,5:0
+};
+
 Object.values(dados.local).forEach(c=>{
 
-riscoPorDico[c.dico]=c.data.rcm;
+const r=c.data.rcm;
+
+riscoPorDico[c.dico]=r;
+
+if(contagem[r]!==undefined){
+contagem[r]++;
+}
 
 });
+
+document.getElementById("stats").innerHTML=
+
+"<span style='color:#00cc00'>Reduzido: "+contagem[1]+"</span> | "+
+"<span style='color:#ffff00'>Moderado: "+contagem[2]+"</span> | "+
+"<span style='color:#ff9900'>Elevado: "+contagem[3]+"</span> | "+
+"<span style='color:#ff3300'>Muito Elevado: "+contagem[4]+"</span> | "+
+"<span style='color:#990000'>Máximo: "+contagem[5]+"</span>";
 
 if(camada) map.removeLayer(camada);
 
