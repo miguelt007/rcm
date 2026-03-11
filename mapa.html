@@ -1,27 +1,48 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+
 <meta charset="utf-8">
 <title>Mapa de Risco de Incêndio</title>
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
 <style>
-body{margin:0;font-family:Arial;}
-#topbar{padding:10px;background:#333;color:white;text-align:center;font-weight:bold;font-size:20px;}
-#controls{padding:10px;background:#f2f2f2;border-bottom:1px solid #ccc;text-align:center;}
-#map{height:90vh;width:100%;}
-.legenda{background:white;padding:10px;line-height:18px;color:#333;box-shadow:0 0 5px rgba(0,0,0,0.3);}
+
+body{
+font-family:Arial;
+margin:0;
+padding:0;
+}
+
+#topbar{
+padding:10px;
+background:#222;
+color:white;
+font-size:20px;
+text-align:center;
+}
+
+#map{
+height:92vh;
+width:100%;
+}
+
+.legenda{
+background:white;
+padding:10px;
+line-height:18px;
+box-shadow:0 0 5px rgba(0,0,0,0.3);
+}
+
 </style>
+
 </head>
+
 <body>
 
-<div id="topbar">Mapa de Risco de Incêndio em Portugal (Incluindo Ilhas)</div>
-
-<div id="controls">
-Selecionar dia:
-<select id="dia">
-<option value="0">Hoje</option>
-<option value="1">Amanhã</option>
-</select>
+<div id="topbar">
+Mapa de Risco de Incêndio (IPMA)
 </div>
 
 <div id="map"></div>
@@ -29,83 +50,121 @@ Selecionar dia:
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-// Inicializar mapa
+
 const map = L.map('map').setView([39.5,-8],7);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-  attribution:'&copy; OpenStreetMap &copy; CARTO',
-  subdomains:'abcd',
-  maxZoom:19
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+attribution:'© OpenStreetMap'
 }).addTo(map);
 
-let camada;
+let riscoPorDico = {};
 
-// cores e nomes de risco
-function corRisco(r){ return {1:"#00cc00",2:"#ffff00",3:"#ff9900",4:"#ff3300",5:"#990000"}[r] || "#999"; }
-function nomeRisco(r){ return {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito Elevado",5:"Máximo"}[r] || "Sem dados"; }
+// cores do risco
+function corRisco(r){
 
-// carregar dados IPMA + GeoAPI.pt
-async function carregar(dia){
-    const url = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
-    const resp = await fetch(url);
-    const dados = await resp.json();
+return {
+1:"#00cc00",
+2:"#ffff00",
+3:"#ff9900",
+4:"#ff3300",
+5:"#990000"
+}[r] || "#999";
 
-    if(camada) map.removeLayer(camada);
-    camada = L.layerGroup();
-
-    // criar todas as promessas em paralelo
-    const promises = Object.values(dados.local).map(async c => {
-        const risco = c.data.rcm;
-        const lat = c.latitude;
-        const lon = c.longitude;
-
-        try {
-            const res = await fetch(`https://json.geoapi.pt/gps/${lat},${lon}?json=1`);
-            const geo = await res.json();
-            const nomeConcelho = geo.concelho || "Desconhecido";
-
-            const marker = L.circleMarker([lat, lon], {
-                radius:7,
-                color: corRisco(risco),
-                fillColor: corRisco(risco),
-                fillOpacity:0.85,
-                weight:1
-            });
-
-            marker.bindTooltip(`<b>${nomeConcelho}</b><br>Alerta: ${nomeRisco(risco)}`, {sticky:true});
-            marker.bindPopup(`<b>Concelho:</b> ${nomeConcelho}<br><b>Alerta:</b> ${nomeRisco(risco)}`);
-            marker.addTo(camada);
-
-        } catch(e){
-            console.error("Erro GeoAPI:", e);
-        }
-    });
-
-    await Promise.all(promises);
-    camada.addTo(map);
 }
 
-// carregar hoje inicialmente
-carregar(0);
+// nome do risco
+function nomeRisco(r){
 
-// mudar dia
-document.getElementById("dia").addEventListener("change", e => {
-    carregar(e.target.value);
+return {
+1:"Reduzido",
+2:"Moderado",
+3:"Elevado",
+4:"Muito Elevado",
+5:"Máximo"
+}[r];
+
+}
+
+async function carregar(){
+
+// API IPMA
+const resposta = await fetch("https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json");
+
+const dados = await resposta.json();
+
+// criar tabela DICO -> risco
+Object.values(dados.local).forEach(c => {
+
+riscoPorDico[c.dico] = c.data.rcm;
+
 });
 
-// legenda
-const legenda = L.control({position:'bottomright'});
-legenda.onAdd = function(){
-    const div = L.DomUtil.create('div','legenda');
-    div.innerHTML =
-        "<b>Risco de Incêndio</b><br>"+
-        "<i style='background:#00cc00;width:12px;height:12px;display:inline-block'></i> Reduzido<br>"+
-        "<i style='background:#ffff00;width:12px;height:12px;display:inline-block'></i> Moderado<br>"+
-        "<i style='background:#ff9900;width:12px;height:12px;display:inline-block'></i> Elevado<br>"+
-        "<i style='background:#ff3300;width:12px;height:12px;display:inline-block'></i> Muito Elevado<br>"+
-        "<i style='background:#990000;width:12px;height:12px;display:inline-block'></i> Máximo";
-    return div;
+// carregar concelhos
+const geo = await fetch("concelhos.geojson");
+const concelhos = await geo.json();
+
+L.geoJSON(concelhos,{
+
+style:function(feature){
+
+const dico = feature.properties.DICO;
+const risco = riscoPorDico[dico];
+
+return{
+
+color:"#333",
+weight:1,
+fillColor:corRisco(risco),
+fillOpacity:0.7
+
 };
+
+},
+
+onEachFeature:function(feature,layer){
+
+const nome = feature.properties.Concelho;
+const dico = feature.properties.DICO;
+const risco = riscoPorDico[dico];
+
+layer.bindPopup(
+
+"<b>"+nome+"</b><br>"+
+"Risco: "+nomeRisco(risco)
+
+);
+
+}
+
+}).addTo(map);
+
+}
+
+carregar();
+
+
+// legenda
+
+const legenda = L.control({position:'bottomright'});
+
+legenda.onAdd = function(){
+
+const div = L.DomUtil.create('div','legenda');
+
+div.innerHTML =
+"<b>Risco de Incêndio</b><br>"+
+"<i style='background:#00cc00;width:12px;height:12px;display:inline-block'></i> Reduzido<br>"+
+"<i style='background:#ffff00;width:12px;height:12px;display:inline-block'></i> Moderado<br>"+
+"<i style='background:#ff9900;width:12px;height:12px;display:inline-block'></i> Elevado<br>"+
+"<i style='background:#ff3300;width:12px;height:12px;display:inline-block'></i> Muito Elevado<br>"+
+"<i style='background:#990000;width:12px;height:12px;display:inline-block'></i> Máximo";
+
+return div;
+
+};
+
 legenda.addTo(map);
+
 </script>
 
 </body>
