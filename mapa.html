@@ -123,6 +123,7 @@ attribution:'© OpenStreetMap'
 
 let camada;
 let riscoPorDico={};
+let intervalPiscar = null;
 
 function corRisco(r){
 return {
@@ -144,23 +145,35 @@ return {
 }[r] || "Sem dados";
 }
 
-// função para animar cor suavemente
+// animação suave de cor
 function animarCor(layer, novaCor, duracao=500){
-let oldColor = layer.options.fillColor;
 let start = null;
-
 function step(timestamp){
 if(!start) start = timestamp;
-let progress = (timestamp-start)/duracao;
+let progress = (timestamp - start)/duracao;
 if(progress>1) progress=1;
-
 layer.setStyle({fillColor:novaCor});
-if(progress<1){
-requestAnimationFrame(step);
+if(progress<1){ requestAnimationFrame(step); }
 }
+requestAnimationFrame(step);
 }
 
-requestAnimationFrame(step);
+// piscar concelhos com risco Máximo
+function iniciarPiscar(){
+if(intervalPiscar) clearInterval(intervalPiscar);
+
+intervalPiscar = setInterval(()=>{
+camada.eachLayer(layer=>{
+const dico = layer.feature.properties.DICO;
+const risco = riscoPorDico[dico];
+if(risco===5){
+const corAtual = layer.options.fillColor;
+layer.setStyle({
+fillColor: corAtual === "#990000" ? "#ff3333" : "#990000"
+});
+}
+});
+},500);
 }
 
 async function carregar(dia){
@@ -178,7 +191,7 @@ let contagem={1:0,2:0,3:0,4:0,5:0};
 Object.values(dados.local).forEach(c=>{
 const r=c.data.rcm;
 riscoPorDico[c.dico]=r;
-if(contagem[r]!==undefined){ contagem[r]++; }
+if(contagem[r]!==undefined) contagem[r]++;
 });
 
 // mostrar número de concelhos por risco
@@ -189,12 +202,14 @@ document.getElementById("stats").innerHTML=
 "<span style='color:#ff3300'>Muito Elevado: "+contagem[4]+"</span> | "+
 "<span style='color:#990000'>Máximo: "+contagem[5]+"</span>";
 
-if(camada) {
+if(camada){
   // animar transição de cores
   camada.eachLayer(l=>{
     const novoRisco = riscoPorDico[l.feature.properties.DICO];
     animarCor(l, corRisco(novoRisco), 500);
   });
+  // reiniciar piscar
+  iniciarPiscar();
   return;
 }
 
@@ -241,6 +256,8 @@ map.fitBounds(e.target.getBounds());
 
 camada.addTo(map);
 
+// iniciar piscar concelhos com risco Máximo
+iniciarPiscar();
 }
 
 // carregar hoje
