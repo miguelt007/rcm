@@ -144,6 +144,25 @@ return {
 }[r] || "Sem dados";
 }
 
+// função para animar cor suavemente
+function animarCor(layer, novaCor, duracao=500){
+let oldColor = layer.options.fillColor;
+let start = null;
+
+function step(timestamp){
+if(!start) start = timestamp;
+let progress = (timestamp-start)/duracao;
+if(progress>1) progress=1;
+
+layer.setStyle({fillColor:novaCor});
+if(progress<1){
+requestAnimationFrame(step);
+}
+}
+
+requestAnimationFrame(step);
+}
+
 async function carregar(dia){
 
 const url="https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d"+dia+".json";
@@ -170,7 +189,14 @@ document.getElementById("stats").innerHTML=
 "<span style='color:#ff3300'>Muito Elevado: "+contagem[4]+"</span> | "+
 "<span style='color:#990000'>Máximo: "+contagem[5]+"</span>";
 
-if(camada) map.removeLayer(camada);
+if(camada) {
+  // animar transição de cores
+  camada.eachLayer(l=>{
+    const novoRisco = riscoPorDico[l.feature.properties.DICO];
+    animarCor(l, corRisco(novoRisco), 500);
+  });
+  return;
+}
 
 const geo=await fetch("concelhos-simples.geojson"); // versão simplificada
 const concelhos=await geo.json();
@@ -195,7 +221,6 @@ layer.bindPopup(
 "<div style='font-size:15px'><b>"+nome+"</b><br>Risco: <b>"+nomeRisco(risco)+"</b></div>"
 );
 
-// hover highlight
 layer.on({
 mouseover:function(e){
 const l=e.target;
@@ -207,10 +232,9 @@ camada.resetStyle(e.target);
 e.target.closePopup();
 },
 click:function(e){
-map.fitBounds(e.target.getBounds()); // zoom no concelho
+map.fitBounds(e.target.getBounds());
 }
 });
-
 }
 
 });
