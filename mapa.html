@@ -56,64 +56,59 @@ async function mudarDia(dia, btn) {
     }
     if (camadaGeoJSON) map.removeLayer(camadaGeoJSON);
 
-    const proxy = "https://api.allorigins.win/get?url=";
+    // MUDANÇA DE PROXY: Tentamos o AllOrigins com um formato mais direto
+    const proxy = "https://api.allorigins.win/raw?url=";
     const t = new Date().getTime();
 
     try {
-        // 1. Carregar Concelhos (LOCAL)
         if (!cacheGeoJSON) {
             const resp = await fetch("concelhos-simples.geojson");
             cacheGeoJSON = await resp.json();
         }
 
-        // 2. Carregar Risco (REMOTO)
         let riscoMap = {};
-        try {
-            const urlR = encodeURIComponent(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json?v=${t}`);
-            const resR = await fetch(proxy + urlR).then(r => r.json());
-            const dadosR = JSON.parse(resR.contents);
-            dadosR.local.forEach(c => { riscoMap[c.dico] = c.data.rcm; });
-        } catch(e) { console.error("Erro Risco IPMA"); }
-
-        // 3. Carregar Meteorologia (REMOTO)
         let obsMap = {};
-        try {
-            const urlO = encodeURIComponent(`https://api.ipma.pt/open-data/observation/meteorology/stations/obs-surface.geojson?v=${t}`);
-            const resO = await fetch(proxy + urlO).then(r => r.json());
-            const dadosO = JSON.parse(resO.contents);
-            dadosO.features.forEach(f => { obsMap[String(f.properties.idEstacao)] = f.properties; });
-        } catch(e) { console.error("Erro Meteo IPMA"); }
 
-        // 4. Desenhar Mapa
+        // Tentamos carregar os dois ficheiros do IPMA
+        try {
+            const urlR = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json?v=${t}`;
+            const resR = await fetch(proxy + encodeURIComponent(urlR)).then(r => r.json());
+            resR.local.forEach(c => { riscoMap[c.dico] = c.data.rcm; });
+        } catch(e) { console.error("Falha no Risco"); }
+
+        try {
+            const urlO = `https://api.ipma.pt/open-data/observation/meteorology/stations/obs-surface.geojson?v=${t}`;
+            const resO = await fetch(proxy + encodeURIComponent(urlO)).then(r => r.json());
+            resO.features.forEach(f => { obsMap[String(f.properties.idEstacao)] = f.properties; });
+        } catch(e) { console.error("Falha na Meteo"); }
+
         camadaGeoJSON = L.geoJSON(cacheGeoJSON, {
             style: (f) => ({
                 fillColor: riscoMap[f.properties.DICO] ? infoRisco[riscoMap[f.properties.DICO]].cor : "#333",
-                weight: 1, color: "#444", fillOpacity: 0.6
+                weight: 1, color: "#444", fillOpacity: 0.7
             }),
             onEachFeature: (f, l) => {
-                const dico = f.properties.DICO;
-                const rId = riscoMap[dico];
-                const estID = String(distritosEstacoes[dico ? dico.substring(0,2) : ""]);
+                const rId = riscoMap[f.properties.DICO];
+                const estID = String(distritosEstacoes[f.properties.DICO ? f.properties.DICO.substring(0,2) : ""]);
                 const obs = obsMap[estID] || Object.values(obsMap).find(o => o.temperatura !== -99);
 
                 let content = `<b>${f.properties.Concelho}</b>`;
                 if(rId) {
-                    content += `<br><img src="images/${infoRisco[rId].img}" class="popup-img"><b style="color:#d35400">Risco: ${infoRisco[rId].nome}</b>`;
+                    content += `<br><img src="images/${infoRisco[rId].img}" class="popup-img"><b>Risco: ${infoRisco[rId].nome}</b>`;
                 }
                 if(obs) {
                     content += `<table class="tab-meteo">
                         <tr><td>🌡️ Temp.</td><td>${obs.temperatura}ºC</td></tr>
                         <tr><td>💧 Humid.</td><td>${obs.humidade}%</td></tr>
                         <tr><td>💨 Vento</td><td>${obs.intensidadeVentoKM || obs.intensidadeVento} km/h</td></tr>
-                    </table><div style="font-size:9px;color:#777;margin-top:5px;">Estação: ${obs.localEstacao}</div>`;
+                    </table>`;
                 }
                 l.bindPopup(content);
             }
         }).addTo(map);
 
     } catch(err) {
-        console.error("Erro crítico:", err);
-        alert("O mapa não conseguiu carregar. Verifica se o ficheiro 'concelhos-simples.geojson' existe.");
+        console.error("Erro Crítico");
     }
 }
 
