@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>IPMA - Risco e Observação Real</title>
+    <title>IPMA - Risco e Meteorologia Real</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         html, body { height: 100%; margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; }
@@ -28,8 +28,8 @@
         }
         .btn-dia.active { background: #ff4400; border-color: #fff; }
 
-        /* Tabela no Popup */
-        .leaflet-popup-content { text-align: center; color: #333; min-width: 200px; font-family: 'Segoe UI', Arial, sans-serif; }
+        /* Estilo da Tabela no Popup */
+        .leaflet-popup-content { text-align: center; color: #333; min-width: 210px; font-family: 'Segoe UI', Arial, sans-serif; }
         .popup-img { width: 70px; height: auto; margin: 5px auto; display: block; }
         .tab-meteo { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; border: 1px solid #eee; }
         .tab-meteo td { border: 1px solid #ddd; padding: 6px; text-align: left; }
@@ -37,6 +37,8 @@
         
         .legend { background: rgba(255, 255, 255, 0.95); padding: 10px; color: #111; font-size: 11px; border-radius: 5px; font-weight: bold; }
         .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
+        
+        .msg-aviso { background:#fff3cd; padding:5px; border-radius:4px; margin-top:8px; font-size:10px; color:#856404; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
@@ -65,7 +67,7 @@ const infoRiscoIPMA = {
     5: { nome: "Máximo", cor: "#990000", img: "Maximo-2022.svg" }
 };
 
-// IDs das Estações Meteorológicas Reais por Distrito
+// Dicionário de IDs das Estações Meteorológicas (Observação Real)
 const distritosParaEstacao = {
     "01": "1210702", "02": "1210770", "03": "1200545", "04": "1200531", "05": "1200551",
     "06": "1200548", "07": "1210731", "08": "1210818", "09": "1200558", "10": "1210710",
@@ -87,20 +89,23 @@ async function mudarDia(dia, btn) {
         const urlRisco = encodeURIComponent(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
         const urlObs = encodeURIComponent(`https://api.ipma.pt/open-data/observation/meteorology/stations/obs-surface.geojson`);
 
-        // Carregar Risco e Concelhos (Essencial)
+        // 1. Carregar Risco e Concelhos (Base)
         const [resRisco, geo] = await Promise.all([
             fetch(proxy + urlRisco).then(r => r.json()).then(d => JSON.parse(d.contents)),
             fetch("concelhos-simples.geojson").then(r => r.json())
         ]);
 
-        // Carregar Observações (Opcional - se falhar não quebra o mapa)
+        // 2. Carregar Observações Reais (Dados Complementares)
         let obsMap = {};
         try {
-            const resObs = await fetch(proxy + urlObs).then(r => r.json()).then(d => JSON.parse(d.contents));
-            if(resObs && resObs.features) {
-                resObs.features.forEach(f => { obsMap[f.properties.idEstacao] = f.properties; });
+            const respObs = await fetch(proxy + urlObs).then(r => r.json());
+            const conteudoObs = JSON.parse(respObs.contents);
+            if (conteudoObs && conteudoObs.features) {
+                conteudoObs.features.forEach(f => {
+                    obsMap[String(f.properties.idEstacao)] = f.properties;
+                });
             }
-        } catch(e) { console.warn("Dados de observação real indisponíveis."); }
+        } catch(e) { console.warn("Erro ao carregar meteorologia em tempo real."); }
 
         const riscoPorDico = {};
         if(resRisco && resRisco.local) {
@@ -116,7 +121,7 @@ async function mudarDia(dia, btn) {
                 const dico = f.properties.DICO;
                 const r = riscoPorDico[dico];
                 const distId = dico ? dico.substring(0, 2) : null;
-                const estacaoId = distritosParaEstacao[distId];
+                const estacaoId = distId ? String(distritosParaEstacao[distId]) : null;
                 const obs = obsMap[estacaoId];
 
                 if(r) {
@@ -128,19 +133,21 @@ async function mudarDia(dia, btn) {
                     `;
 
                     if(obs) {
-                        const temp = obs.temperatura !== -99 ? obs.temperatura + "ºC" : "--";
-                        const hum = obs.humidade !== -99 ? obs.humidade + "%" : "--";
-                        const vento = obs.intensidadeVento !== -99 ? obs.intensidadeVento + " km/h" : "--";
-                        
+                        const temp = (obs.temperatura !== -99 && obs.temperatura !== undefined) ? obs.temperatura + "ºC" : "--";
+                        const hum = (obs.humidade !== -99 && obs.humidade !== undefined) ? obs.humidade + "%" : "--";
+                        const vento = (obs.intensidadeVento !== -99 && obs.intensidadeVento !== undefined) ? obs.intensidadeVento + " km/h" : "--";
+                        const prec = (obs.precipitacaoAcumulada !== -99 && obs.precipitacaoAcumulada !== undefined) ? obs.precipitacaoAcumulada + " mm" : "0.0 mm";
+
                         popupHtml += `
                         <table class="tab-meteo">
-                            <tr><td>🌡️ Temperatura</td><td>${temp}</td></tr>
+                            <tr><td>🌡️ Temp.</td><td>${temp}</td></tr>
                             <tr><td>💧 Humidade</td><td>${hum}</td></tr>
                             <tr><td>💨 Vento</td><td>${vento}</td></tr>
+                            <tr><td>🌧️ Precip.</td><td>${prec}</td></tr>
                         </table>
                         <div style="font-size:9px; color:#777; margin-top:5px;">Estação: ${obs.localEstacao}</div>`;
                     } else {
-                        popupHtml += `<p style="font-size:10px; color:#999; margin-top:8px;">Meteorologia real em atualização...</p>`;
+                        popupHtml += `<div class="msg-aviso">⚠️ Meteorologia real em atualização para esta zona.</div>`;
                     }
                     l.bindPopup(popupHtml);
                 }
@@ -148,8 +155,7 @@ async function mudarDia(dia, btn) {
         }).addTo(map);
 
     } catch(e) { 
-        console.error("Erro crítico:", e); 
-        alert("Erro ao carregar ficheiro concelhos-simples.geojson ou API do IPMA.");
+        console.error("Erro crítico:", e);
     }
 }
 
