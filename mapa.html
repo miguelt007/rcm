@@ -2,23 +2,23 @@
 <html lang="pt">
 <head>
     <meta charset="utf-8">
-    <title>IPMA - Risco Rural + Meteo Real</title>
+    <title>IPMA - Risco Total Portugal</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
         html, body { height: 100%; margin: 0; background: #000; font-family: sans-serif; }
         #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 3px solid #ff4400; color: #ff4400; font-weight: bold; }
-        #map { height: calc(100vh - 60px); width: 100%; }
+        #map { height: calc(100vh - 54px); width: 100%; }
         .controles { position: absolute; top: 80px; left: 20px; z-index: 1000; }
-        .btn { background: #333; color: white; border: 1px solid #555; padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        .btn { background: #333; color: white; border: 1px solid #555; padding: 10px 20px; cursor: pointer; border-radius: 5px; }
         .active { background: #ff4400 !important; }
-        .leaflet-popup-content { text-align: center; min-width: 220px; color: #333; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-        td { border: 1px solid #eee; padding: 5px; text-align: left; }
+        .leaflet-popup-content { text-align: center; min-width: 200px; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+        td { border: 1px solid #eee; padding: 4px; text-align: left; }
     </style>
 </head>
 <body>
 
-<div id="topbar">MONITORIZAÇÃO IPMA: RISCO + METEOROLOGIA</div>
+<div id="topbar">RISCO DE INCÊNDIO E PREVISÃO NACIONAL</div>
 <div class="controles">
     <button id="btn0" class="btn active" onclick="carregar(0)">HOJE</button>
     <button id="btn1" class="btn" onclick="carregar(1)">AMANHÃ</button>
@@ -39,29 +39,26 @@ let geojsonCache = null;
 async function carregar(dia) {
     document.getElementById('btn0').classList.toggle('active', dia === 0);
     document.getElementById('btn1').classList.toggle('active', dia === 1);
-    
     if (camada) map.removeLayer(camada);
 
     const proxy = "https://corsproxy.io/?";
-    // URL 1: Risco de Incêndio
     const urlRisco = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
-    // URL 2: Previsão Meteorológica Diária (Geral para todos os concelhos)
-    const urlMeteo = `https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/hp-daily-forecast-day${dia}.json`;
+    // Ficheiro auxiliar com a previsão para TODOS os concelhos
+    const urlPrevisao = `https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/hp-daily-forecast-day${dia}.json`;
 
     try {
         if (!geojsonCache) {
             geojsonCache = await fetch("concelhos-simples.geojson").then(r => r.json());
         }
 
-        // Fazemos os dois pedidos ao mesmo tempo
-        const [resRisco, resMeteo] = await Promise.all([
+        // Carregar os dois ficheiros em simultâneo
+        const [resRisco, resPrevisao] = await Promise.all([
             fetch(proxy + encodeURIComponent(urlRisco)).then(r => r.json()),
-            fetch(proxy + encodeURIComponent(urlMeteo)).then(r => r.json())
+            fetch(proxy + encodeURIComponent(urlPrevisao)).then(r => r.json())
         ]);
 
         const dadosRisco = resRisco.local || (resRisco.rcmF && resRisco.rcmF[0].local);
-        // Criamos um mapa da meteorologia usando o idArea (que muitas vezes coincide com o início do DICO)
-        const listaMeteo = resMeteo.data || resMeteo;
+        const dadosPrevisao = resPrevisao.data || resPrevisao;
 
         camada = L.geoJSON(geojsonCache, {
             style: (f) => {
@@ -72,31 +69,32 @@ async function carregar(dia) {
             },
             onEachFeature: (f, l) => {
                 const d = String(f.properties.DICO);
-                const infoRisco = dadosRisco[d];
-                
-                // Tentamos encontrar a meteorologia correspondente (usando o DICO ou o nome do concelho)
-                const infoMeteo = listaMeteo.find(m => String(m.globalIdLocal).startsWith(d.substring(0,2))) || {};
+                const rcmInfo = dadosRisco[d] || {};
+                const rcmData = rcmInfo.data || {};
 
-                const rcm = (infoRisco && infoRisco.data) ? infoRisco.data.rcm : (infoRisco ? infoRisco.rcm : 1);
-                
-                // Se o RCM vier com meteo (raro), usamos. Se não, usamos a API de cidades.
-                const tMax = (infoRisco && infoRisco.data && infoRisco.data.tMax) ? infoRisco.data.tMax : (infoMeteo.tMax || "--");
-                const tMin = (infoRisco && infoRisco.data && infoRisco.data.tMin) ? infoRisco.data.tMin : (infoMeteo.tMin || "--");
-                const vento = (infoRisco && infoRisco.data && infoRisco.data.ff_dir_id) ? infoRisco.data.ff_dir_id : (infoMeteo.predWindDir || "--");
+                // Tentar encontrar a previsão pelo ID do concelho (os primeiros 4 dígitos do DICO costumam bater certo)
+                const prevConcelho = dadosPrevisao.find(p => String(p.globalIdLocal).startsWith(d.substring(0,2))) || {};
+
+                // Lógica de Fallback: Se não tem no RCM, usa a Previsão Geral
+                const tMax = rcmData.tMax || prevConcelho.tMax || "--";
+                const tMin = rcmData.tMin || prevConcelho.tMin || "--";
+                const vento = rcmData.ff_dir_id || prevConcelho.predWindDir || "--";
+                const hum = rcmData.hrMin || "--"; 
+                const rcm = rcmData.rcm || rcmInfo.rcm || 1;
 
                 l.bindPopup(`
                     <b>${f.properties.Concelho}</b><br>
                     <b style="color:${cores[rcm]}">Risco ${nomes[rcm]}</b>
                     <table>
-                        <tr><td>🌡️ Temp Máx</td><td><b>${tMax}ºC</b></td></tr>
-                        <tr><td>🌡️ Temp Mín</td><td><b>${tMin}ºC</b></td></tr>
-                        <tr><td>💨 Vento</td><td><b>${vento}</b></td></tr>
+                        <tr><td>🌡️ Temp Máx/Mín</td><td><b>${tMax}º / ${tMin}ºC</b></td></tr>
+                        <tr><td>💧 Humidade Mín</td><td><b>${hum}%</b></td></tr>
+                        <tr><td>💨 Direção Vento</td><td><b>${vento}</b></td></tr>
                     </table>
                 `);
             }
         }).addTo(map);
 
-    } catch (e) { console.error("Erro:", e); }
+    } catch (e) { console.error(e); }
 }
 
 carregar(0);
