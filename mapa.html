@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Monitorização de Risco de Incêndio - IPMA vs EFFIS</title>
+    <title>Monitorização de Risco de Incêndio - IPMA vs COPERNICUS</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #000; color: white; overflow: hidden; }
@@ -37,6 +37,10 @@
 
         #mapIPMA, #mapEFFIS { width: 100%; height: 100%; background: #050505; }
         .popup-img { width: 80px; height: auto; margin: 8px auto; display: block; }
+        
+        /* Correção do PopUp */
+        .leaflet-popup-content-wrapper { color: #333; text-align: center; }
+        .leaflet-popup-content b { font-weight: bold; }
     </style>
 </head>
 <body>
@@ -90,14 +94,17 @@ const infoRiscoIPMA = {
     5: { nome: "Máximo", cor: "#990000", img: "Maximo-2022.svg" }
 };
 
-// --- LOGICA EFFIS (WMS OFICIAL) ---
-let camadaEFFIS = L.tileLayer.wms("https://fwi-forecast.jrc.ec.europa.eu/wms", {
-    layers: 'fwi_max_d0',
-    format: 'image/png',
-    transparent: true,
-    version: '1.3.0',
+// --- NOVA LÓGICA EFFIS (COM CORS PROXY) ---
+// Usamos o corsproxy.io para contornar o bloqueio do Copernicus
+function getEffisUrl(dia) {
+    const baseUrl = `https://fwi-forecast.jrc.ec.europa.eu/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=fwi_max_d${dia}&STYLES=fwi_max_fixed&FORMAT=image/png&TRANSPARENT=TRUE&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox}`;
+    return `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`;
+}
+
+let camadaEFFIS = L.tileLayer(getEffisUrl(0), {
     opacity: 0.7,
-    styles: 'fwi_max_fixed'
+    attribution: '© EFFIS/Copernicus',
+    tileSize: 256
 }).addTo(mapEFFIS);
 
 function mudarDiaEFFIS(dia, btn) {
@@ -105,17 +112,13 @@ function mudarDiaEFFIS(dia, btn) {
     btn.classList.add('active');
     document.getElementById('label-effis').innerText = `EFFIS: Previsão D+${dia}`;
     mapEFFIS.removeLayer(camadaEFFIS);
-    camadaEFFIS = L.tileLayer.wms("https://fwi-forecast.jrc.ec.europa.eu/wms", {
-        layers: `fwi_max_d${dia}`,
-        format: 'image/png',
-        transparent: true,
-        version: '1.3.0',
+    camadaEFFIS = L.tileLayer(getEffisUrl(dia), { 
         opacity: 0.7,
-        styles: 'fwi_max_fixed'
+        tileSize: 256
     }).addTo(mapEFFIS);
 }
 
-// --- LOGICA IPMA ---
+// --- LOGICA IPMA (COM ALLORIGINS PROXY) ---
 let camadaGeoJSON;
 async function mudarDiaIPMA(dia, btn) {
     if(btn) {
@@ -142,7 +145,9 @@ async function mudarDiaIPMA(dia, btn) {
             onEachFeature: (f, l) => {
                 const r = riscoPorDico[f.properties.DICO];
                 if(r) {
-                    l.bindPopup(`<div style="padding:5px;"><b style="font-size:15px; display:block;">${f.properties.Concelho}</b><img src="images/${infoRiscoIPMA[r].img}" class="popup-img"><b>Risco: ${infoRiscoIPMA[r].nome}</b></div>`);
+                    const info = infoRiscoIPMA[r];
+                    // CORREÇÃO: Adicionada tag <b> no Risco
+                    l.bindPopup(`<div style="padding:5px;"><b style="font-size:15px; display:block;">${f.properties.Concelho}</b><img src="images/${info.img}" class="popup-img"><b>Risco: ${info.nome}</b></div>`);
                 }
             }
         }).addTo(mapIPMA);
@@ -151,9 +156,9 @@ async function mudarDiaIPMA(dia, btn) {
 
 // SINCRONIZAÇÃO
 mapIPMA.on('drag zoom', () => mapEFFIS.setView(mapIPMA.getCenter(), mapIPMA.getZoom(), {animate:false}));
-mapEFFIS.on('drag zoom', () => mapIPMA.setView(mapEFFIS.getCenter(), mapIPMA.getZoom(), {animate:false}));
+mapEFFIS.on('drag zoom', () => mapIPMA.setView(mapIPMA.getCenter(), mapIPMA.getZoom(), {animate:false}));
 
-// LEGENDAS (IPMA Esquerda, EFFIS Direita)
+// LEGENDAS
 const legIPMA = L.control({position: 'bottomleft'});
 legIPMA.onAdd = () => {
     const div = L.DomUtil.create('div', 'legend');
