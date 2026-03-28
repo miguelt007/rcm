@@ -15,9 +15,6 @@
         }
         #titulo-principal { font-family: 'Segoe UI', Arial, sans-serif; font-size: 19px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
         
-        /* Aviso de dados indisponíveis */
-        #status-aviso { font-size: 11px; color: #ff9900; margin-top: 5px; display: none; }
-
         #mapIPMA { flex-grow: 1; width: 100%; background: #050505; }
         
         .controles {
@@ -41,7 +38,6 @@
 
 <div id="topbar">
     <p id="titulo-principal">Risco de Incêndio por Concelho (IPMA)</p>
-    <div id="status-aviso">⚠️ Dados ainda não publicados pelo IPMA para este dia.</div>
 </div>
 
 <div id="mapIPMA"></div>
@@ -49,7 +45,6 @@
 <div class="controles">
     <button class="btn-dia active" onclick="mudarDia(0, this)">HOJE</button>
     <button class="btn-dia" onclick="mudarDia(1, this)">AMANHÃ</button>
-    <button class="btn-dia" onclick="mudarDia(2, this)">DEPOIS DE AMANHÃ</button>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -69,7 +64,6 @@ const infoRiscoIPMA = {
 let camadaGeoJSON;
 
 async function mudarDia(dia, btn) {
-    document.getElementById('status-aviso').style.display = 'none';
     if(btn) {
         document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -84,7 +78,7 @@ async function mudarDia(dia, btn) {
         const resp = await fetch(proxy + urlRisco).then(r => r.json());
         const dadosRisco = JSON.parse(resp.contents);
         
-        if(!dadosRisco || !dadosRisco.local) throw new Error();
+        if(!dadosRisco || !dadosRisco.local) return;
 
         const geo = await fetch("concelhos-simples.geojson").then(r => r.json());
         const riscoPorDico = {};
@@ -104,8 +98,7 @@ async function mudarDia(dia, btn) {
         }).addTo(map);
 
     } catch(e) { 
-        document.getElementById('status-aviso').style.display = 'block';
-        console.log("Dados D" + dia + " ainda não disponíveis.");
+        console.log("Erro ao carregar dados do dia " + dia);
     }
 }
 
