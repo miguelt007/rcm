@@ -2,26 +2,26 @@
 <html lang="pt">
 <head>
     <meta charset="utf-8">
-    <title>IPMA - Risco Rural Final</title>
+    <title>IPMA - Risco Rural + Meteo Real</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
         html, body { height: 100%; margin: 0; background: #000; font-family: sans-serif; }
-        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 3px solid #ff4400; color: #ff4400; font-weight: bold; text-transform: uppercase; }
-        #map { height: calc(100vh - 54px); width: 100%; }
-        .controles { position: absolute; top: 80px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 5px; }
-        .btn { background: #333; color: #fff; border: 1px solid #555; padding: 10px; cursor: pointer; font-weight: bold; border-radius: 4px; }
-        .btn.active { background: #ff4400; }
-        .leaflet-popup-content { text-align: center; min-width: 220px; }
-        .tab { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
-        .tab td { border: 1px solid #ddd; padding: 4px; text-align: left; }
+        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 3px solid #ff4400; color: #ff4400; font-weight: bold; }
+        #map { height: calc(100vh - 60px); width: 100%; }
+        .controles { position: absolute; top: 80px; left: 20px; z-index: 1000; }
+        .btn { background: #333; color: white; border: 1px solid #555; padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        .active { background: #ff4400 !important; }
+        .leaflet-popup-content { text-align: center; min-width: 220px; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        td { border: 1px solid #eee; padding: 5px; text-align: left; }
     </style>
 </head>
 <body>
 
-<div id="topbar">Risco de Incêndio Rural - IPMA</div>
+<div id="topbar">MONITORIZAÇÃO IPMA: RISCO + METEOROLOGIA</div>
 <div class="controles">
-    <button id="b0" class="btn active" onclick="carregar(0)">HOJE</button>
-    <button id="b1" class="btn" onclick="carregar(1)">AMANHÃ</button>
+    <button id="btn0" class="btn active" onclick="carregar(0)">HOJE</button>
+    <button id="btn1" class="btn" onclick="carregar(1)">AMANHÃ</button>
 </div>
 <div id="map"></div>
 
@@ -34,59 +34,69 @@ const cores = { 1: "#00cc00", 2: "#ffff00", 3: "#ff9900", 4: "#ff3300", 5: "#990
 const nomes = { 1: "Reduzido", 2: "Moderado", 3: "Elevado", 4: "Muito Elevado", 5: "Máximo" };
 
 let camada;
-let geojsonCache;
+let geojsonCache = null;
 
 async function carregar(dia) {
-    document.getElementById('b0').className = dia === 0 ? 'btn active' : 'btn';
-    document.getElementById('b1').className = dia === 1 ? 'btn active' : 'btn';
+    document.getElementById('btn0').classList.toggle('active', dia === 0);
+    document.getElementById('btn1').classList.toggle('active', dia === 1);
     
     if (camada) map.removeLayer(camada);
 
-    // Proxy para evitar erros de CORS no GitHub
     const proxy = "https://corsproxy.io/?";
-    const url = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json?v=${Date.now()}`;
+    // URL 1: Risco de Incêndio
+    const urlRisco = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
+    // URL 2: Previsão Meteorológica Diária (Geral para todos os concelhos)
+    const urlMeteo = `https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/hp-daily-forecast-day${dia}.json`;
 
     try {
         if (!geojsonCache) {
             geojsonCache = await fetch("concelhos-simples.geojson").then(r => r.json());
         }
 
-        const res = await fetch(proxy + encodeURIComponent(url)).then(r => r.json());
-        
-        // --- EXTRAÇÃO DOS DADOS ---
-        // O IPMA coloca os dados em 'local'. Vamos garantir que acedemos a esse objeto.
-        const fonteDados = res.local || (res.rcmF && res.rcmF[0].local);
+        // Fazemos os dois pedidos ao mesmo tempo
+        const [resRisco, resMeteo] = await Promise.all([
+            fetch(proxy + encodeURIComponent(urlRisco)).then(r => r.json()),
+            fetch(proxy + encodeURIComponent(urlMeteo)).then(r => r.json())
+        ]);
+
+        const dadosRisco = resRisco.local || (resRisco.rcmF && resRisco.rcmF[0].local);
+        // Criamos um mapa da meteorologia usando o idArea (que muitas vezes coincide com o início do DICO)
+        const listaMeteo = resMeteo.data || resMeteo;
 
         camada = L.geoJSON(geojsonCache, {
             style: (f) => {
-                const dico = String(f.properties.DICO);
-                const item = fonteDados[dico];
-                const rcmVal = (item && item.data) ? item.data.rcm : null;
+                const d = String(f.properties.DICO);
+                const info = dadosRisco[d];
+                const rcmVal = (info && info.data) ? info.data.rcm : (info ? info.rcm : null);
                 return { fillColor: rcmVal ? cores[rcmVal] : "#333", weight: 1, color: "#444", fillOpacity: 0.7 };
             },
             onEachFeature: (f, l) => {
-                const dico = String(f.properties.DICO);
-                const item = fonteDados[dico];
+                const d = String(f.properties.DICO);
+                const infoRisco = dadosRisco[d];
+                
+                // Tentamos encontrar a meteorologia correspondente (usando o DICO ou o nome do concelho)
+                const infoMeteo = listaMeteo.find(m => String(m.globalIdLocal).startsWith(d.substring(0,2))) || {};
 
-                if (item && item.data) {
-                    const d = item.data; // Entramos na pasta 'data' que viste na consola
-                    
-                    l.bindPopup(`
-                        <b>${f.properties.Concelho}</b><br>
-                        <b style="color:${cores[d.rcm]}">Risco ${nomes[d.rcm]}</b>
-                        <table class="tab">
-                            <tr><td>🌡️ Temp Máx/Mín</td><td><b>${d.tMax}º / ${d.tMin}ºC</b></td></tr>
-                            <tr><td>💧 Hum Mín/Máx</td><td><b>${d.hrMin}% / ${d.hrMax}%</b></td></tr>
-                            <tr><td>💨 Vento (Dir/Vel)</td><td><b>${d.ff_dir_id} / ${d.ff_int_id} km/h</b></td></tr>
-                        </table>
-                    `);
-                } else {
-                    l.bindPopup(`<b>${f.properties.Concelho}</b><br>Dados Indisponíveis`);
-                }
+                const rcm = (infoRisco && infoRisco.data) ? infoRisco.data.rcm : (infoRisco ? infoRisco.rcm : 1);
+                
+                // Se o RCM vier com meteo (raro), usamos. Se não, usamos a API de cidades.
+                const tMax = (infoRisco && infoRisco.data && infoRisco.data.tMax) ? infoRisco.data.tMax : (infoMeteo.tMax || "--");
+                const tMin = (infoRisco && infoRisco.data && infoRisco.data.tMin) ? infoRisco.data.tMin : (infoMeteo.tMin || "--");
+                const vento = (infoRisco && infoRisco.data && infoRisco.data.ff_dir_id) ? infoRisco.data.ff_dir_id : (infoMeteo.predWindDir || "--");
+
+                l.bindPopup(`
+                    <b>${f.properties.Concelho}</b><br>
+                    <b style="color:${cores[rcm]}">Risco ${nomes[rcm]}</b>
+                    <table>
+                        <tr><td>🌡️ Temp Máx</td><td><b>${tMax}ºC</b></td></tr>
+                        <tr><td>🌡️ Temp Mín</td><td><b>${tMin}ºC</b></td></tr>
+                        <tr><td>💨 Vento</td><td><b>${vento}</b></td></tr>
+                    </table>
+                `);
             }
         }).addTo(map);
 
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Erro:", e); }
 }
 
 carregar(0);
