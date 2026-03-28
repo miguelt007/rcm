@@ -14,12 +14,13 @@
         .btn-dia { background: #333; color: white; border: 1px solid #555; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .btn-dia.active { background: #ff4400; border-color: #fff; }
         .leaflet-popup-content { text-align: center; color: #333; min-width: 220px; font-family: 'Segoe UI', Arial, sans-serif; }
-        .popup-img { width: 70px; height: auto; margin: 5px auto; display: block; }
+        .popup-img { width: 75px; height: auto; margin: 5px auto; display: block; }
         .tab-meteo { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; border: 1px solid #eee; }
         .tab-meteo td { border: 1px solid #ddd; padding: 6px; text-align: left; }
         .tab-meteo td:first-child { background: #f8f8f8; font-weight: bold; width: 45%; }
         .legend { background: rgba(255, 255, 255, 0.95); padding: 10px; font-size: 11px; border-radius: 5px; font-weight: bold; }
         .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
+        .msg-aviso { background:#fff3cd; padding:8px; border-radius:4px; margin-top:8px; font-size:11px; color:#856404; border: 1px solid #ffeeba; text-align: center; }
     </style>
 </head>
 <body>
@@ -44,7 +45,7 @@ const infoRiscoIPMA = {
     5: { nome: "Máximo", cor: "#990000", img: "Maximo-2022.svg" }
 };
 
-// Mapeamento de Distrito para Estação Meteorológica (IDs do IPMA)
+// IDs das Estações principais por Distrito
 const distritosParaEstacao = {
     "01": 1210702, "02": 1210770, "03": 1200545, "04": 1200531, "05": 1200551,
     "06": 1200548, "07": 1210731, "08": 1210818, "09": 1200558, "10": 1210710,
@@ -62,38 +63,35 @@ async function mudarDia(dia, btn) {
     }
     if (camadaGeoJSON) map.removeLayer(camadaGeoJSON);
 
+    // Tentamos usar o proxy secundário se o AllOrigins estiver a falhar
     const proxy = "https://api.allorigins.win/get?url=";
     const t = new Date().getTime();
 
     try {
-        // 1. Carregar GeoJSON apenas uma vez
         if (!dadosGeoJSONLocal) {
             dadosGeoJSONLocal = await fetch("concelhos-simples.geojson").then(r => r.json());
         }
 
-        // 2. Carregar Risco de Incêndio (Cores do Mapa)
         const urlRisco = encodeURIComponent(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json?v=${t}`);
-        const respRisco = await fetch(proxy + urlRisco).then(r => r.json());
-        const dadosRisco = JSON.parse(respRisco.contents);
-        
-        const riscoPorDico = {};
-        Object.values(dadosRisco.local).forEach(c => { riscoPorDico[c.dico] = c.data.rcm; });
+        const urlObs = encodeURIComponent(`https://api.ipma.pt/open-data/observation/meteorology/stations/obs-surface.geojson?v=${t}`);
 
-        // 3. Carregar Observações (Dados das Estações)
-        let obsMap = {};
-        try {
-            // TENTATIVA A: API GEOJSON (Observação de Superfície)
-            const urlObs = encodeURIComponent(`https://api.ipma.pt/open-data/observation/meteorology/stations/obs-surface.geojson?v=${t}`);
-            const respObs = await fetch(proxy + urlObs).then(r => r.json());
-            const jsonObs = JSON.parse(respObs.contents);
-            jsonObs.features.forEach(f => { 
+        const [resRisco, resObs] = await Promise.all([
+            fetch(proxy + urlRisco).then(r => r.json()).then(d => JSON.parse(d.contents)),
+            fetch(proxy + urlObs).then(r => r.json()).then(d => JSON.parse(d.contents))
+        ]);
+
+        const obsMap = {};
+        if (resObs && resObs.features) {
+            resObs.features.forEach(f => {
                 if(f.properties.temperatura !== -99) {
-                    obsMap[f.properties.idEstacao] = f.properties; 
+                    obsMap[f.properties.idEstacao] = f.properties;
                 }
             });
-        } catch(e) { console.warn("API de Observação falhou. A tentar alternativa..."); }
+        }
 
-        // 4. Desenhar Mapa
+        const riscoPorDico = {};
+        Object.values(resRisco.local).forEach(c => { riscoPorDico[c.dico] = c.data.rcm; });
+
         camadaGeoJSON = L.geoJSON(dadosGeoJSONLocal, {
             style: (f) => ({
                 fillColor: riscoPorDico[f.properties.DICO] ? infoRiscoIPMA[riscoPorDico[f.properties.DICO]].cor : "transparent",
@@ -104,34 +102,44 @@ async function mudarDia(dia, btn) {
                 const r = riscoPorDico[dico];
                 const distId = dico ? dico.substring(0,2) : "";
                 const estID = distritosParaEstacao[distId];
-                
-                // Tenta pegar a estação do distrito, se não houver, pega a primeira disponível para teste
-                const o = obsMap[estID] || Object.values(obsMap)[0]; 
+                const o = obsMap[estID];
 
                 if(r) {
-                    let html = `<b style="font-size:15px;">${f.properties.Concelho}</b><img src="images/${infoRiscoIPMA[r].img}" class="popup-img"><b style="color:#d35400">Risco: ${infoRiscoIPMA[r].nome}</b>`;
-                    
+                    let popupHtml = `<b>${f.properties.Concelho}</b>
+                                    <img src="images/${infoRiscoIPMA[r].img}" class="popup-img">
+                                    <b style="color:#d35400">Risco: ${infoRiscoIPMA[r].nome}</b>`;
+
                     if(o) {
-                        html += `<table class="tab-meteo">
+                        popupHtml += `
+                        <table class="tab-meteo">
                             <tr><td>🌡️ Temp.</td><td>${o.temperatura}ºC</td></tr>
                             <tr><td>💧 Humid.</td><td>${o.humidade}%</td></tr>
                             <tr><td>💨 Vento</td><td>${o.intensidadeVento} km/h</td></tr>
-                            <tr><td>🌧️ Chuva</td><td>${o.precipitacaoAcumulada} mm</td></tr>
-                        </table><div style="font-size:9px;color:#777;margin-top:5px;">Estação: ${o.localEstacao}</div>`;
+                        </table>
+                        <div style="font-size:9px;color:#777;margin-top:5px;">Estação: ${o.localEstacao}</div>`;
                     } else {
-                        html += `<div style="background:#fff3cd;padding:8px;border-radius:4px;margin-top:10px;font-size:11px;color:#856404;border:1px solid #ffeeba;">⚠️ Meteorologia real temporariamente indisponível no IPMA para esta zona.</div>`;
+                        // Plano B: Se a estação do distrito falhar, tenta pegar qualquer uma próxima que tenha dados
+                        const backup = Object.values(obsMap)[0];
+                        if(backup) {
+                             popupHtml += `
+                            <table class="tab-meteo">
+                                <tr><td>🌡️ Temp.</td><td>${backup.temperatura}ºC</td></tr>
+                                <tr><td>💧 Humid.</td><td>${backup.humidade}%</td></tr>
+                                <tr><td>💨 Vento</td><td>${backup.intensidadeVento} km/h</td></tr>
+                            </table>
+                            <div style="font-size:9px;color:#777;margin-top:5px;">Ref: ${backup.localEstacao} (Estação mais próxima)</div>`;
+                        } else {
+                            popupHtml += `<div class="msg-aviso">⚠️ Meteorologia em atualização.</div>`;
+                        }
                     }
-                    l.bindPopup(html);
+                    l.bindPopup(popupHtml);
                 }
             }
         }).addTo(map);
 
-    } catch(err) {
-        console.error("Erro fatal:", err);
-    }
+    } catch(err) { console.error("Erro:", err); }
 }
 
-// Legenda fixa
 const legenda = L.control({position: 'bottomright'});
 legenda.onAdd = () => {
     const div = L.DomUtil.create('div', 'legend');
