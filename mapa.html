@@ -3,41 +3,33 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>IPMA - Risco de Incêndio</title>
+    <title>IPMA - Risco e Meteorologia</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         html, body { height: 100%; margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; }
-        
-        #topbar { 
-            background: #1a1a1a; padding: 15px; text-align: center; 
-            border-bottom: 2px solid #ff4400; height: 75px; flex-shrink: 0; 
-            z-index: 2000; position: relative;
-        }
+        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 2px solid #ff4400; height: 75px; flex-shrink: 0; z-index: 2000; position: relative; }
         #titulo-principal { font-family: 'Segoe UI', Arial, sans-serif; font-size: 19px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
-        
         #mapIPMA { flex-grow: 1; width: 100%; background: #050505; }
         
-        .controles {
-            position: absolute; bottom: 30px; left: 20px; z-index: 1000;
-            background: rgba(0,0,0,0.9); padding: 10px; border-radius: 8px;
-            display: flex; gap: 8px; border: 1px solid #444;
-        }
-        .btn-dia { 
-            background: #333; color: white; border: 1px solid #555; padding: 8px 12px; 
-            cursor: pointer; border-radius: 4px; font-size: 11px; font-weight: bold;
-        }
+        .controles { position: absolute; bottom: 30px; left: 20px; z-index: 1000; background: rgba(0,0,0,0.9); padding: 10px; border-radius: 8px; display: flex; gap: 8px; border: 1px solid #444; }
+        .btn-dia { background: #333; color: white; border: 1px solid #555; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .btn-dia.active { background: #ff4400; border-color: #fff; }
 
+        /* Estilo da Tabela no Popup */
+        .leaflet-popup-content { text-align: center; color: #333; min-width: 180px; font-family: 'Segoe UI', Arial, sans-serif; }
+        .popup-img { width: 70px; height: auto; margin: 5px auto; display: block; }
+        .tab-meteo { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+        .tab-meteo td { border: 1px solid #ddd; padding: 4px; text-align: left; }
+        .tab-meteo td:first-child { background: #f4f4f4; font-weight: bold; width: 50%; }
+        
         .legend { background: rgba(255, 255, 255, 0.95); padding: 10px; color: #111; font-size: 11px; border-radius: 5px; font-weight: bold; }
         .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
-        .leaflet-popup-content { text-align: center; color: #333; }
-        .popup-img { width: 85px; height: auto; margin: 10px auto; display: block; }
     </style>
 </head>
 <body>
 
 <div id="topbar">
-    <p id="titulo-principal">Risco de Incêndio por Concelho (IPMA)</p>
+    <p id="titulo-principal">Risco de Incêndio e Meteorologia (IPMA)</p>
 </div>
 
 <div id="mapIPMA"></div>
@@ -68,21 +60,30 @@ async function mudarDia(dia, btn) {
         document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
     }
-    
     if (camadaGeoJSON) map.removeLayer(camadaGeoJSON);
 
     try {
         const proxy = "https://api.allorigins.win/get?url=";
+        
+        // 1. Risco de Incêndio
         const urlRisco = encodeURIComponent(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
-        
-        const resp = await fetch(proxy + urlRisco).then(r => r.json());
-        const dadosRisco = JSON.parse(resp.contents);
-        
-        if(!dadosRisco || !dadosRisco.local) return;
+        const respRisco = await fetch(proxy + urlRisco).then(r => r.json());
+        const dadosRisco = JSON.parse(respRisco.contents);
 
+        // 2. Meteorologia (Previsão diária por localidade)
+        const urlMeteo = encodeURIComponent(`https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/hp-daily-forecast-day${dia}.json`);
+        const respMeteo = await fetch(proxy + urlMeteo).then(r => r.json());
+        const dadosMeteo = JSON.parse(respMeteo.contents);
+
+        // 3. GeoJSON Local
         const geo = await fetch("concelhos-simples.geojson").then(r => r.json());
+
         const riscoPorDico = {};
         Object.values(dadosRisco.local).forEach(c => { riscoPorDico[c.dico] = c.data.rcm; });
+
+        // Mapear meteo por GlobalIdLocal (que associaremos ao DICO)
+        const meteoMap = {};
+        dadosMeteo.data.forEach(m => { meteoMap[m.globalIdLocal] = m; });
 
         camadaGeoJSON = L.geoJSON(geo, {
             style: (f) => ({ 
@@ -91,15 +92,37 @@ async function mudarDia(dia, btn) {
             }),
             onEachFeature: (f, l) => {
                 const r = riscoPorDico[f.properties.DICO];
+                // Como o GeoJSON não tem GlobalID, o IPMA usa frequentemente os mesmos IDs para cidades principais. 
+                // Tentaremos obter os dados se o GLOBALID estiver presente ou via mapeamento.
+                const m = meteoMap[f.properties.GLOBALID]; 
+
                 if(r) {
-                    l.bindPopup(`<div style="padding:5px;"><b style="font-size:15px; display:block;">${f.properties.Concelho}</b><img src="images/${infoRiscoIPMA[r].img}" class="popup-img"><b>Risco: ${infoRiscoIPMA[r].nome}</b></div>`);
+                    const info = infoRiscoIPMA[r];
+                    let popupHtml = `
+                        <b style="font-size:14px; display:block;">${f.properties.Concelho}</b>
+                        <img src="images/${info.img}" class="popup-img">
+                        <b>Risco: ${info.nome}</b>
+                    `;
+
+                    // Se houver dados meteorológicos para este ID
+                    if(m) {
+                        popupHtml += `
+                        <table class="tab-meteo">
+                            <tr><td>🌡️ Temp.</td><td>${m.tMin}º / ${m.tMax}ºC</td></tr>
+                            <tr><td>💨 Vento</td><td>${m.ffWind} km/h</td></tr>
+                            <tr><td>💧 Humidade</td><td>${m.precipitaProb}%</td></tr>
+                            <tr><td>🌧️ Precip.</td><td>${m.precipitaProb}% prob.</td></tr>
+                        </table>`;
+                    } else {
+                        popupHtml += `<p style="font-size:10px; color: #999; margin-top:5px;">Dados meteorológicos detalhados indisponíveis para este concelho.</p>`;
+                    }
+
+                    l.bindPopup(popupHtml);
                 }
             }
         }).addTo(map);
 
-    } catch(e) { 
-        console.log("Erro ao carregar dados do dia " + dia);
-    }
+    } catch(e) { console.error("Erro no carregamento."); }
 }
 
 const legenda = L.control({position: 'bottomright'});
