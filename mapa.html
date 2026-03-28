@@ -6,22 +6,31 @@
     <title>IPMA - Risco de Incêndio</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #000; color: white; overflow: hidden; }
+        /* Garantir que o body não corta o topo */
+        html, body { height: 100%; margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; }
         
-        /* BARRA DE TOPO GARANTIDA */
+        /* BARRA DE TOPO CORRIGIDA */
         #topbar { 
             background: #1a1a1a; 
-            padding: 20px; 
+            padding: 15px; 
             text-align: center; 
-            border-bottom: 2px solid #333; 
-            height: 80px; 
-            box-sizing: border-box;
-            position: relative;
+            border-bottom: 2px solid #ff4400; 
+            height: 70px; 
+            flex-shrink: 0; /* Impede que a barra encolha */
             z-index: 2000;
+            position: relative;
         }
-        #titulo-principal { font-size: 18px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
+        #titulo-principal { 
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 20px; 
+            font-weight: bold; 
+            color: #ff4400; 
+            margin: 0; 
+            text-transform: uppercase; 
+        }
 
-        #mapIPMA { width: 100vw; height: calc(100vh - 80px); background: #050505; }
+        /* MAPA OCUPA O RESTO DO ECRÃ */
+        #mapIPMA { flex-grow: 1; width: 100%; background: #050505; }
         
         .controles {
             position: absolute; bottom: 30px; left: 20px; z-index: 1000;
@@ -37,7 +46,7 @@
         .legend { background: rgba(255, 255, 255, 0.95); padding: 10px; color: #111; font-size: 11px; border-radius: 5px; font-weight: bold; }
         .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
 
-        .leaflet-popup-content { text-align: center; color: #333; min-width: 150px; }
+        .leaflet-popup-content { text-align: center; color: #333; }
         .popup-img { width: 85px; height: auto; margin: 10px auto; display: block; }
     </style>
 </head>
@@ -58,7 +67,7 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 const limitesPT = [[36.8,-10.5], [42.3,-6]];
-const map = L.map('mapIPMA').fitBounds(limitesPT);
+const map = L.map('mapIPMA').setView([39.5, -8], 7);
 
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
@@ -84,11 +93,15 @@ async function mudarDia(dia, btn) {
         const proxy = "https://api.allorigins.win/get?url=";
         const urlRisco = encodeURIComponent(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
         
-        // 1. Carregar Risco
+        // Tentativa de carregar dados do IPMA
         const resp = await fetch(proxy + urlRisco).then(r => r.json());
         const dadosRisco = JSON.parse(resp.contents);
         
-        // 2. Carregar GeoJSON (local)
+        if(!dadosRisco || !dadosRisco.local) {
+            throw new Error("Dados não disponíveis");
+        }
+
+        // Carregar GeoJSON local
         const geo = await fetch("concelhos-simples.geojson").then(r => r.json());
         
         const riscoPorDico = {};
@@ -99,9 +112,7 @@ async function mudarDia(dia, btn) {
         camadaGeoJSON = L.geoJSON(geo, {
             style: (f) => ({ 
                 fillColor: riscoPorDico[f.properties.DICO] ? infoRiscoIPMA[riscoPorDico[f.properties.DICO]].cor : "transparent", 
-                weight: 1, 
-                color: "#444", 
-                fillOpacity: 0.6 
+                weight: 1, color: "#444", fillOpacity: 0.6 
             }),
             onEachFeature: (f, l) => {
                 const r = riscoPorDico[f.properties.DICO];
@@ -119,24 +130,20 @@ async function mudarDia(dia, btn) {
         }).addTo(map);
 
     } catch(e) { 
-        console.error("Erro técnico:", e); 
-        alert("Erro ao carregar dados do IPMA. Tente recarregar a página.");
+        console.error("Erro:", e);
+        alert("O IPMA ainda não disponibilizou os dados para este dia. Tente mais tarde.");
     }
 }
 
-// LEGENDA
 const legenda = L.control({position: 'bottomright'});
 legenda.onAdd = () => {
     const div = L.DomUtil.create('div', 'legend');
     div.innerHTML = '<b>Risco IPMA</b><br>';
-    for (let i in infoRiscoIPMA) {
-        div.innerHTML += `<i style="background:${infoRiscoIPMA[i].cor}"></i> ${infoRiscoIPMA[i].nome}<br>`;
-    }
+    for (let i in infoRiscoIPMA) div.innerHTML += `<i style="background:${infoRiscoIPMA[i].cor}"></i> ${infoRiscoIPMA[i].nome}<br>`;
     return div;
 };
 legenda.addTo(map);
 
-// Iniciar
 mudarDia(0);
 </script>
 </body>
