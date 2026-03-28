@@ -6,30 +6,18 @@
     <title>IPMA - Risco de Incêndio</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
-        /* Garantir que o body não corta o topo */
         html, body { height: 100%; margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; }
         
-        /* BARRA DE TOPO CORRIGIDA */
         #topbar { 
-            background: #1a1a1a; 
-            padding: 15px; 
-            text-align: center; 
-            border-bottom: 2px solid #ff4400; 
-            height: 70px; 
-            flex-shrink: 0; /* Impede que a barra encolha */
-            z-index: 2000;
-            position: relative;
+            background: #1a1a1a; padding: 15px; text-align: center; 
+            border-bottom: 2px solid #ff4400; height: 75px; flex-shrink: 0; 
+            z-index: 2000; position: relative;
         }
-        #titulo-principal { 
-            font-family: 'Segoe UI', Arial, sans-serif;
-            font-size: 20px; 
-            font-weight: bold; 
-            color: #ff4400; 
-            margin: 0; 
-            text-transform: uppercase; 
-        }
+        #titulo-principal { font-family: 'Segoe UI', Arial, sans-serif; font-size: 19px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
+        
+        /* Aviso de dados indisponíveis */
+        #status-aviso { font-size: 11px; color: #ff9900; margin-top: 5px; display: none; }
 
-        /* MAPA OCUPA O RESTO DO ECRÃ */
         #mapIPMA { flex-grow: 1; width: 100%; background: #050505; }
         
         .controles {
@@ -45,7 +33,6 @@
 
         .legend { background: rgba(255, 255, 255, 0.95); padding: 10px; color: #111; font-size: 11px; border-radius: 5px; font-weight: bold; }
         .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
-
         .leaflet-popup-content { text-align: center; color: #333; }
         .popup-img { width: 85px; height: auto; margin: 10px auto; display: block; }
     </style>
@@ -54,6 +41,7 @@
 
 <div id="topbar">
     <p id="titulo-principal">Risco de Incêndio por Concelho (IPMA)</p>
+    <div id="status-aviso">⚠️ Dados ainda não publicados pelo IPMA para este dia.</div>
 </div>
 
 <div id="mapIPMA"></div>
@@ -61,14 +49,13 @@
 <div class="controles">
     <button class="btn-dia active" onclick="mudarDia(0, this)">HOJE</button>
     <button class="btn-dia" onclick="mudarDia(1, this)">AMANHÃ</button>
-    <button class="btn-dia" onclick="mudarDia(2, this)">P. AMANHÃ</button>
+    <button class="btn-dia" onclick="mudarDia(2, this)">DEPOIS DE AMANHÃ</button>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 const limitesPT = [[36.8,-10.5], [42.3,-6]];
 const map = L.map('mapIPMA').setView([39.5, -8], 7);
-
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
 const infoRiscoIPMA = {
@@ -82,6 +69,7 @@ const infoRiscoIPMA = {
 let camadaGeoJSON;
 
 async function mudarDia(dia, btn) {
+    document.getElementById('status-aviso').style.display = 'none';
     if(btn) {
         document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -93,21 +81,14 @@ async function mudarDia(dia, btn) {
         const proxy = "https://api.allorigins.win/get?url=";
         const urlRisco = encodeURIComponent(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`);
         
-        // Tentativa de carregar dados do IPMA
         const resp = await fetch(proxy + urlRisco).then(r => r.json());
         const dadosRisco = JSON.parse(resp.contents);
         
-        if(!dadosRisco || !dadosRisco.local) {
-            throw new Error("Dados não disponíveis");
-        }
+        if(!dadosRisco || !dadosRisco.local) throw new Error();
 
-        // Carregar GeoJSON local
         const geo = await fetch("concelhos-simples.geojson").then(r => r.json());
-        
         const riscoPorDico = {};
-        Object.values(dadosRisco.local).forEach(c => {
-            riscoPorDico[c.dico] = c.data.rcm;
-        });
+        Object.values(dadosRisco.local).forEach(c => { riscoPorDico[c.dico] = c.data.rcm; });
 
         camadaGeoJSON = L.geoJSON(geo, {
             style: (f) => ({ 
@@ -117,21 +98,14 @@ async function mudarDia(dia, btn) {
             onEachFeature: (f, l) => {
                 const r = riscoPorDico[f.properties.DICO];
                 if(r) {
-                    const info = infoRiscoIPMA[r];
-                    l.bindPopup(`
-                        <div style="padding:5px;">
-                            <b style="font-size:15px; display:block;">${f.properties.Concelho}</b>
-                            <img src="images/${info.img}" class="popup-img">
-                            <b>Risco: ${info.nome}</b>
-                        </div>
-                    `);
+                    l.bindPopup(`<div style="padding:5px;"><b style="font-size:15px; display:block;">${f.properties.Concelho}</b><img src="images/${infoRiscoIPMA[r].img}" class="popup-img"><b>Risco: ${infoRiscoIPMA[r].nome}</b></div>`);
                 }
             }
         }).addTo(map);
 
     } catch(e) { 
-        console.error("Erro:", e);
-        alert("O IPMA ainda não disponibilizou os dados para este dia. Tente mais tarde.");
+        document.getElementById('status-aviso').style.display = 'block';
+        console.log("Dados D" + dia + " ainda não disponíveis.");
     }
 }
 
