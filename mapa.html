@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>IPMA vs EFFIS - Previsão Alargada</title>
+<title>IPMA vs EFFIS - Oficial</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
     body { font-family: Segoe UI, Arial; margin: 0; background: #111; color: white; overflow: hidden; }
@@ -15,32 +15,35 @@
     .label-map { 
         position: absolute; top: 10px; left: 50px; z-index: 1000; 
         background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 4px; 
-        font-weight: bold; border: 1px solid #555;
+        font-weight: bold; border: 1px solid #555; font-size: 13px;
     }
 
-    /* Contentor dos Botões no Mapa EFFIS */
     #controles-effis {
-        position: absolute; bottom: 20px; left: 10px; z-index: 1000;
-        background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px;
-        display: flex; flex-wrap: wrap; gap: 5px; max-width: 250px;
+        position: absolute; bottom: 30px; left: 10px; z-index: 1000;
+        background: rgba(0,0,0,0.9); padding: 10px; border-radius: 8px;
+        display: flex; flex-wrap: wrap; gap: 4px; max-width: 220px; border: 1px solid #444;
     }
     .btn-dia {
-        background: #444; color: white; border: none; padding: 5px 10px;
-        cursor: pointer; border-radius: 3px; font-size: 11px;
+        background: #333; color: white; border: 1px solid #555; padding: 4px 8px;
+        cursor: pointer; border-radius: 3px; font-size: 10px; min-width: 38px;
     }
-    .btn-dia:hover { background: #666; }
-    .btn-dia.active { background: #ff4400; font-weight: bold; }
+    .btn-dia.active { background: #ff4400; border-color: #ff6600; font-weight: bold; }
 
-    #mapIPMA, #mapEFFIS { width: 100%; height: 100%; background: #0f0f0f; }
+    #mapIPMA, #mapEFFIS { width: 100%; height: 100%; background: #000; }
 
-    .legenda { background: white; padding: 8px; color: #333; font-size: 11px; line-height: 14px; border-radius: 5px; }
+    /* Estilo da Legenda IPMA */
+    .info.legend {
+        background: white; padding: 10px; color: #333; font-size: 12px;
+        line-height: 18px; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    }
+    .legend i { width: 14px; height: 14px; float: left; margin-right: 8px; opacity: 0.8; }
 </style>
 </head>
 <body>
 
 <div id="topbar">
-    <div style="font-size: 18px; font-weight: bold;">Risco de Incêndio: Comparativo</div>
-    <div id="info-dia" style="font-size: 13px; color: #ffb400; margin-top: 5px;">EFFIS: A mostrar previsão para Hoje (D+0)</div>
+    <div style="font-size: 18px; font-weight: bold;">Monitorização de Risco de Incêndio</div>
+    <div id="info-dia" style="font-size: 13px; color: #ffb400; margin-top: 5px;">EFFIS: Previsão para Hoje (D+0)</div>
 </div>
 
 <div id="map-container">
@@ -49,11 +52,11 @@
         <div id="mapIPMA"></div>
     </div>
     <div class="map-box">
-        <div class="label-map">EFFIS (Previsão Alargada)</div>
+        <div class="label-map">EFFIS (Mancha Térmica - Copernicus)</div>
         <div id="mapEFFIS"></div>
         
         <div id="controles-effis">
-            <div style="width:100%; font-size:11px; margin-bottom:5px; color:#ccc;">Previsão EFFIS:</div>
+            <div style="width:100%; font-size:11px; margin-bottom:5px; color:#ffb400; font-weight:bold;">PREVISÃO EFFIS:</div>
             <button class="btn-dia active" onclick="mudarDiaEFFIS(0, this)">D+0</button>
             <button class="btn-dia" onclick="mudarDiaEFFIS(1, this)">D+1</button>
             <button class="btn-dia" onclick="mudarDiaEFFIS(2, this)">D+2</button>
@@ -80,57 +83,56 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').add
 const mapEFFIS = L.map('mapEFFIS').fitBounds(limitesPT);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapEFFIS);
 
-// --- CAMADA EFFIS (CORRIGIDA) ---
-// O segredo para os dados aparecerem é usar o CRS: L.CRS.EPSG3857 (padrão) e a versão 1.1.1
+// --- CAMADA EFFIS (URL Alternativo mais compatível) ---
 let camadaEFFIS = L.tileLayer.wms("https://maps.wildfire.vgt.vito.be/gwc/service/wms", {
     layers: 'fwi.max.d0',
     format: 'image/png',
     transparent: true,
     version: '1.1.1',
     opacity: 0.7,
-    attribution: "© EFFIS/Copernicus"
+    uppercase: true,
+    attribution: "© EFFIS"
 }).addTo(mapEFFIS);
 
 function mudarDiaEFFIS(dia, btn) {
-    // Atualizar botões
     document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 
-    // Atualizar Texto
-    const textos = ["Hoje", "Amanhã", "Depois de Amanhã"];
-    let txt = dia < 3 ? textos[dia] : `Daqui a ${dia} dias`;
-    document.getElementById('info-dia').innerText = `EFFIS: A mostrar previsão para ${txt} (D+${dia})`;
+    document.getElementById('info-dia').innerText = `EFFIS: Previsão para D+${dia}`;
 
-    // Atualizar Camada WMS
     mapEFFIS.removeLayer(camadaEFFIS);
     camadaEFFIS = L.tileLayer.wms("https://maps.wildfire.vgt.vito.be/gwc/service/wms", {
         layers: `fwi.max.d${dia}`,
         format: 'image/png',
         transparent: true,
         version: '1.1.1',
-        opacity: 0.7
+        opacity: 0.7,
+        uppercase: true
     }).addTo(mapEFFIS);
 }
 
-// --- SINCRONIZAÇÃO (MOVIMENTO LADO A LADO) ---
-let isSyncing = false;
-mapIPMA.on('move', () => {
-    if (!isSyncing) {
-        isSyncing = true;
-        mapEFFIS.setView(mapIPMA.getCenter(), mapIPMA.getZoom(), { animate: false });
-        isSyncing = false;
-    }
-});
+// --- SINCRONIZAÇÃO ---
+mapIPMA.sync = function(other) {
+    this.on('move', () => other.setView(this.getCenter(), this.getZoom(), {animate:false}));
+};
+mapIPMA.on('move', () => mapEFFIS.setView(mapIPMA.getCenter(), mapIPMA.getZoom(), {animate:false}));
+mapEFFIS.on('move', () => mapIPMA.setView(mapEFFIS.getCenter(), mapEFFIS.getZoom(), {animate:false}));
 
-mapEFFIS.on('move', () => {
-    if (!isSyncing) {
-        isSyncing = true;
-        mapIPMA.setView(mapEFFIS.getCenter(), mapEFFIS.getZoom(), { animate: false });
-        isSyncing = false;
+// --- LEGENDA IPMA (Recuperada) ---
+const legenda = L.control({position: 'bottomleft'});
+legenda.onAdd = function() {
+    const div = L.DomUtil.create('div', 'info legend');
+    const grades = [1, 2, 3, 4, 5];
+    const labels = ["Reduzido", "Moderado", "Elevado", "Muito Elevado", "Máximo"];
+    div.innerHTML = '<b>Risco IPMA</b><br>';
+    for (let i = 0; i < grades.length; i++) {
+        div.innerHTML += '<i style="background:' + obterCor(grades[i]) + '"></i> ' + labels[i] + '<br>';
     }
-});
+    return div;
+};
+legenda.addTo(mapIPMA);
 
-// --- CARREGAR DADOS IPMA (IGUAL AO ANTERIOR) ---
+// --- DADOS IPMA ---
 async function carregarIPMA() {
     try {
         const resp = await fetch("https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json");
@@ -147,11 +149,11 @@ async function carregarIPMA() {
                 weight: 1, color: "#444", fillOpacity: 0.6
             }),
             onEachFeature: (f, l) => {
-                const r = riscoPorDico[f.properties.DICO] || "Sem dados";
-                l.bindPopup(`<b>${f.properties.Concelho}</b><br>Risco IPMA: <b>${r}</b>`);
+                const r = riscoPorDico[f.properties.DICO] || "N/A";
+                l.bindPopup(`<b>${f.properties.Concelho}</b><br>Risco: ${r}`);
             }
         }).addTo(mapIPMA);
-    } catch(e) { console.error("Erro IPMA:", e); }
+    } catch(e) { console.log("Erro IPMA"); }
 }
 
 function obterCor(r) {
