@@ -2,28 +2,24 @@
 <html lang="pt">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>IPMA - Risco Rural (Final)</title>
+    <title>IPMA - Risco Rural</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
-        html, body { height: 100%; margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; font-family: sans-serif; }
-        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 3px solid #ff4400; z-index: 2000; }
-        #titulo-principal { font-size: 20px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
+        html, body { height: 100%; margin: 0; background: #000; display: flex; flex-direction: column; font-family: sans-serif; }
+        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 3px solid #ff4400; color: #ff4400; font-weight: bold; }
         #mapIPMA { flex-grow: 1; width: 100%; background: #050505; }
-        .controles { position: absolute; top: 100px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; border: 1px solid #444; }
+        .controles { position: absolute; top: 100px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
         .btn-dia { background: #333; color: #fff; border: 1px solid #555; padding: 12px; cursor: pointer; font-weight: bold; border-radius: 6px; }
         .btn-dia.active { background: #ff4400; border-color: #fff; }
-        .leaflet-popup-content { text-align: center; min-width: 220px; color: #222; }
-        .tab-meteo { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-        .tab-meteo td { border: 1px solid #eee; padding: 7px; text-align: left; }
+        .leaflet-popup-content { text-align: center; min-width: 200px; }
+        .tab-meteo { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; border: 1px solid #eee; }
+        .tab-meteo td { border: 1px solid #eee; padding: 6px; text-align: left; }
         .temp-alerta { color: #d32f2f; font-weight: bold; }
-        .legend { background: rgba(255, 255, 255, 0.9); padding: 10px; border-radius: 5px; font-weight: bold; font-size: 11px; }
-        .legend i { width: 15px; height: 15px; float: left; margin-right: 8px; border-radius: 3px; }
     </style>
 </head>
 <body>
 
-    <div id="topbar"><h1 id="titulo-principal">Risco de Incêndio Rural - IPMA</h1></div>
+    <div id="topbar">RISCO DE INCÊNDIO E METEOROLOGIA</div>
     <div class="controles">
         <button class="btn-dia active" onclick="mudarDia(0, this)">HOJE</button>
         <button class="btn-dia" onclick="mudarDia(1, this)">AMANHÃ</button>
@@ -42,14 +38,6 @@
         let camada;
         let cacheGeoJSON = null;
 
-        // Função para tentar encontrar o valor de uma chave ignorando maiúsculas/minúsculas
-        function obterValor(obj, chavesPossiveis) {
-            for (let c of chavesPossiveis) {
-                if (obj[c] !== undefined && obj[c] !== null) return obj[c];
-            }
-            return "--";
-        }
-
         async function mudarDia(dia, btn) {
             if(btn) {
                 document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
@@ -62,65 +50,57 @@
 
             try {
                 if (!cacheGeoJSON) {
-                    cacheGeoJSON = await fetch("concelhos-simples.geojson").then(r => r.json());
+                    const r = await fetch("concelhos-simples.geojson");
+                    cacheGeoJSON = await r.json();
                 }
 
                 const resp = await fetch(proxy + encodeURIComponent(urlIPMA));
                 const resR = await resp.json();
                 
-                const dadosLimpos = {};
-                const fonte = resR.local;
-                
-                if (Array.isArray(fonte)) {
-                    fonte.forEach(item => { if(item.dico) dadosLimpos[String(item.dico)] = item; });
-                } else {
-                    Object.keys(fonte).forEach(key => { dadosLimpos[String(key)] = fonte[key]; });
-                }
+                // Mapear os dados do IPMA garantindo que o DICO é a chave
+                const dadosIPMA = resR.local;
 
                 camada = L.geoJSON(cacheGeoJSON, {
                     style: (f) => {
-                        const dico = String(f.properties.DICO);
-                        const rcmVal = (dadosLimpos[dico] && dadosLimpos[dico].data) ? dadosLimpos[dico].data.rcm : null;
-                        return { fillColor: rcmVal ? coresRisco[rcmVal] : "#333", weight: 1, color: "#555", fillOpacity: 0.7 };
+                        const d = String(f.properties.DICO);
+                        const rcmVal = (dadosIPMA[d] && dadosIPMA[d].data) ? dadosIPMA[d].data.rcm : null;
+                        return { 
+                            fillColor: rcmVal ? coresRisco[rcmVal] : "#333", 
+                            weight: 1, color: "#555", fillOpacity: 0.7 
+                        };
                     },
                     onEachFeature: (f, l) => {
-                        const dico = String(f.properties.DICO);
-                        const item = dadosLimpos[dico];
+                        const d = String(f.properties.DICO);
+                        const item = dadosIPMA[d];
+
+                        // DEBUG: Vê na consola se o DICO do mapa existe no IPMA
+                        console.log(`Concelho: ${f.properties.Concelho} | DICO Mapa: ${d} | Encontrado no IPMA:`, !!item);
 
                         if (item && item.data) {
-                            const d = item.data;
-                            
-                            // Tenta encontrar as variáveis mesmo que o IPMA mude os nomes
-                            const tMax = obterValor(d, ["tMax", "tmax", "TMax", "temp_max"]);
-                            const hrMin = obterValor(d, ["hrMin", "hrmin", "HRMin", "hr_min"]);
-                            const vento = obterValor(d, ["ff_dir_id", "ff_dir", "dirVento"]);
-                            const rcm = d.rcm || 1;
+                            const met = item.data;
+                            const tMax = met.tMax; 
+                            const hrMin = met.hrMin;
+                            const vento = met.ff_dir_id;
+                            const rcm = met.rcm;
 
                             const classeTemp = (parseFloat(tMax) > 30) ? "temp-alerta" : "";
 
                             l.bindPopup(`
-                                <b>${f.properties.Concelho || "Concelho"}</b><br>
+                                <b>${f.properties.Concelho}</b><br>
                                 <b style="color:${coresRisco[rcm]}">Risco ${nomesRisco[rcm]}</b>
                                 <table class="tab-meteo">
                                     <tr><td>🌡️ T. Máxima</td><td class="${classeTemp}">${tMax}ºC</td></tr>
                                     <tr><td>💧 H. Mínima</td><td>${hrMin}%</td></tr>
-                                    <tr><td>💨 Vento</td><td>${vento}</td></tr>
+                                    <tr><td>💨 Vento (Dir)</td><td>${vento}</td></tr>
                                 </table>
                             `);
+                        } else {
+                            l.bindPopup(`<b>${f.properties.Concelho}</b><br><small style="color:red">DICO ${d} sem dados no IPMA</small>`);
                         }
                     }
                 }).addTo(map);
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error("Erro na ligação:", err); }
         }
-
-        const legenda = L.control({position: 'bottomright'});
-        legenda.onAdd = () => {
-            const div = L.DomUtil.create('div', 'legend');
-            div.innerHTML = '<b>RISCO IPMA</b><br>';
-            for (let i in coresRisco) div.innerHTML += `<i style="background:${coresRisco[i]}"></i> ${nomesRisco[i]}<br>`;
-            return div;
-        };
-        legenda.addTo(map);
 
         mudarDia(0);
     </script>
