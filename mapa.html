@@ -3,33 +3,21 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Monitorização de Risco de Incêndio - IPMA vs EFFIS</title>
+    <title>Monitorização de Risco de Incêndio</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #000; color: white; overflow: hidden; }
         #topbar { background: #1a1a1a; padding: 10px; text-align: center; border-bottom: 2px solid #333; height: 85px; box-sizing: border-box; }
         #titulo-principal { font-size: 20px; font-weight: bold; color: #ff4400; margin: 0; }
         #subtitulo { font-size: 13px; color: #bbb; margin-top: 4px; }
-
         #map-container { display: flex; height: calc(100vh - 85px); width: 100vw; }
         .map-box { width: 50%; height: 100%; border-right: 1px solid #333; position: relative; }
-        .label-map { 
-            position: absolute; top: 15px; left: 60px; z-index: 1000; 
-            background: rgba(0,0,0,0.85); padding: 8px 15px; border-radius: 5px; 
-            font-weight: bold; border: 1px solid #555; font-size: 13px;
-        }
-
+        .label-map { position: absolute; top: 15px; left: 60px; z-index: 1000; background: rgba(0,0,0,0.85); padding: 8px 15px; border-radius: 5px; font-weight: bold; border: 1px solid #555; font-size: 13px; }
         .legend { background: rgba(255, 255, 255, 0.95); padding: 10px; color: #111; font-size: 11px; border-radius: 8px; font-weight: bold; }
         .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
-
-        #controles-effis {
-            position: absolute; bottom: 30px; left: 15px; z-index: 1000;
-            background: rgba(0,0,0,0.9); padding: 10px; border-radius: 10px;
-            display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; border: 1px solid #444; width: 220px;
-        }
+        #controles-effis { position: absolute; bottom: 30px; left: 15px; z-index: 1000; background: rgba(0,0,0,0.9); padding: 10px; border-radius: 10px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; border: 1px solid #444; width: 220px; }
         .btn-dia { background: #333; color: white; border: 1px solid #555; padding: 6px; cursor: pointer; border-radius: 4px; font-size: 10px; }
         .btn-dia.active { background: #ff4400; border-color: #fff; font-weight: bold; }
-
         #mapIPMA, #mapEFFIS { width: 100%; height: 100%; background: #050505; }
         .popup-img { width: 85px; height: auto; margin: 10px auto; display: block; }
     </style>
@@ -81,16 +69,13 @@ const infoRiscoIPMA = {
     5: { nome: "Máximo", cor: "#990000", img: "Maximo-2022.svg" }
 };
 
-// --- NOVA ABORDAGEM EFFIS (VIA TILES DIRETOS DO COPERNICUS) ---
-// Esta é a forma mais robusta para evitar bloqueios do servidor
+// --- EFFIS COM URL DE TILES (MAIS ESTÁVEL) ---
 function getEffisUrl(dia) {
-    return `https://bc-fwi-forecast.jrc.ec.europa.eu/tiles/fwi_max_d${dia}/fwi_max_fixed/{z}/{x}/{y}.png`;
+    // Usando o servidor de mapas do EFFIS que não bloqueia CORS
+    return `https://gwis-cms.jrc.ec.europa.eu/maps/fwi.max.d${dia}/fwi.max.fixed/{z}/{x}/{y}.png`;
 }
 
-let camadaEFFIS = L.tileLayer(getEffisUrl(0), {
-    opacity: 0.75,
-    attribution: "© EFFIS/Copernicus"
-}).addTo(mapEFFIS);
+let camadaEFFIS = L.tileLayer(getEffisUrl(0), { opacity: 0.75 }).addTo(mapEFFIS);
 
 function mudarDiaEFFIS(dia, btn) {
     document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
@@ -116,23 +101,22 @@ legIPMA.addTo(mapIPMA);
 const legEFFIS = L.control({position: 'bottomright'});
 legEFFIS.onAdd = () => {
     const div = L.DomUtil.create('div', 'legend');
-    div.innerHTML = '<b>Legenda EFFIS</b><br>' +
-        '<i style="background:#0000ff"></i> Muito Baixo<br>' +
-        '<i style="background:#00ff00"></i> Médio<br>' +
-        '<i style="background:#ffff00"></i> Alto<br>' +
-        '<i style="background:#ff9900"></i> Muito Alto<br>' +
-        '<i style="background:#ff0000"></i> Extremo';
+    div.innerHTML = '<b>Legenda EFFIS (FWI)</b><br><i style="background:#0000ff"></i> Muito Baixo<br><i style="background:#00ff00"></i> Médio<br><i style="background:#ffff00"></i> Alto<br><i style="background:#ff9900"></i> Muito Alto<br><i style="background:#ff0000"></i> Extremo';
     return div;
 };
 legEFFIS.addTo(mapEFFIS);
 
-// CARREGAR IPMA
+// CARREGAR IPMA COM PROXY PARA EVITAR BLOQUEIO
 async function carregarIPMA() {
     try {
-        const [rcm, geo] = await Promise.all([
-            fetch("https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json").then(r => r.json()),
-            fetch("concelhos-simple.geojson").then(r => r.json())
-        ]);
+        // Usamos um proxy gratuito para contornar o erro de CORS do IPMA
+        const urlIPMA = "https://api.allorigins.win/get?url=" + encodeURIComponent("https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json");
+        const resp = await fetch(urlIPMA);
+        const jsonProxy = await resp.json();
+        const rcm = JSON.parse(jsonProxy.contents);
+
+        const geo = await fetch("concelhos-simples.geojson").then(r => r.json());
+        
         const riscoPorDico = {};
         Object.values(rcm.local).forEach(c => riscoPorDico[c.dico] = c.data.rcm);
 
@@ -144,17 +128,11 @@ async function carregarIPMA() {
             onEachFeature: (f, l) => {
                 const r = riscoPorDico[f.properties.DICO];
                 if(r) {
-                    l.bindPopup(`
-                        <div style="padding:5px;">
-                            <b style="font-size:15px; display:block;">${f.properties.Concelho}</b>
-                            <img src="images/${infoRiscoIPMA[r].img}" class="popup-img">
-                            <b>Risco: ${infoRiscoIPMA[r].nome}</b>
-                        </div>
-                    `);
+                    l.bindPopup(`<div style="padding:5px;"><b style="font-size:15px; display:block;">${f.properties.Concelho}</b><img src="images/${infoRiscoIPMA[r].img}" class="popup-img"><b>Risco: ${infoRiscoIPMA[r].nome}</b></div>`);
                 }
             }
         }).addTo(mapIPMA);
-    } catch(e) { console.error("Erro no IPMA"); }
+    } catch(e) { console.error("Erro carregamento IPMA", e); }
 }
 carregarIPMA();
 </script>
