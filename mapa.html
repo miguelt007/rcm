@@ -7,34 +7,17 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         html, body { height: 100%; margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; }
-        
-        #topbar { 
-            background: #1a1a1a; padding: 15px; text-align: center; 
-            border-bottom: 2px solid #ff4400; height: 75px; flex-shrink: 0; 
-            z-index: 2000; position: relative;
-        }
+        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 2px solid #ff4400; height: 75px; flex-shrink: 0; z-index: 2000; position: relative; }
         #titulo-principal { font-family: 'Segoe UI', Arial, sans-serif; font-size: 19px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
-        
         #mapIPMA { flex-grow: 1; width: 100%; background: #050505; }
-        
-        .controles {
-            position: absolute; bottom: 30px; left: 20px; z-index: 1000;
-            background: rgba(0,0,0,0.9); padding: 10px; border-radius: 8px;
-            display: flex; gap: 8px; border: 1px solid #444;
-        }
-        .btn-dia { 
-            background: #333; color: white; border: 1px solid #555; padding: 8px 12px; 
-            cursor: pointer; border-radius: 4px; font-size: 11px; font-weight: bold;
-        }
+        .controles { position: absolute; bottom: 30px; left: 20px; z-index: 1000; background: rgba(0,0,0,0.9); padding: 10px; border-radius: 8px; display: flex; gap: 8px; border: 1px solid #444; }
+        .btn-dia { background: #333; color: white; border: 1px solid #555; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .btn-dia.active { background: #ff4400; border-color: #fff; }
-
-        /* Estilo da Tabela no Popup */
         .leaflet-popup-content { text-align: center; color: #333; min-width: 190px; font-family: 'Segoe UI', Arial, sans-serif; }
         .popup-img { width: 75px; height: auto; margin: 5px auto; display: block; }
         .tab-meteo { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; border: 1px solid #eee; }
         .tab-meteo td { border: 1px solid #ddd; padding: 5px; text-align: left; }
         .tab-meteo td:first-child { background: #f8f8f8; font-weight: bold; width: 45%; }
-        
         .legend { background: rgba(255, 255, 255, 0.95); padding: 10px; color: #111; font-size: 11px; border-radius: 5px; font-weight: bold; }
         .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
     </style>
@@ -66,26 +49,11 @@ const infoRiscoIPMA = {
     5: { nome: "Máximo", cor: "#990000", img: "Maximo-2022.svg" }
 };
 
-// Dicionário para ligar Distrito (primeiros 2 dígitos do DICO) ao ID da Capital no IPMA
 const distritosParaID = {
-    "01": "1010500", // Aveiro
-    "02": "1020500", // Beja
-    "03": "1030300", // Braga
-    "04": "1040200", // Bragança
-    "05": "1050200", // Castelo Branco
-    "06": "1060300", // Coimbra
-    "07": "1070500", // Évora
-    "08": "1080500", // Faro
-    "09": "1090700", // Guarda
-    "10": "1100900", // Leiria
-    "11": "1110600", // Lisboa
-    "12": "1121400", // Portalegre
-    "13": "1131200", // Porto
-    "14": "1141600", // Santarém
-    "15": "1151200", // Setúbal
-    "16": "1160900", // Viana do Castelo
-    "17": "1171400", // Vila Real
-    "18": "1182300"  // Viseu
+    "01": 1010500, "02": 1020500, "03": 1030300, "04": 1040200, "05": 1050200,
+    "06": 1060300, "07": 1070500, "08": 1080500, "09": 1090700, "10": 1100900,
+    "11": 1110600, "12": 1121400, "13": 1131200, "14": 1141600, "15": 1151200,
+    "16": 1160900, "17": 1171400, "18": 1182300
 };
 
 let camadaGeoJSON;
@@ -122,37 +90,35 @@ async function mudarDia(dia, btn) {
             onEachFeature: (f, l) => {
                 const dico = f.properties.DICO;
                 const r = riscoPorDico[dico];
-                
-                // Pega nos primeiros 2 dígitos do DICO para saber o distrito
                 const distId = dico.substring(0, 2);
                 const globalId = distritosParaID[distId];
                 const m = meteoMap[globalId];
 
                 if(r) {
                     const info = infoRiscoIPMA[r];
-                    let popupHtml = `
-                        <b style="font-size:15px; display:block;">${f.properties.Concelho}</b>
-                        <img src="images/${info.img}" class="popup-img">
-                        <b style="color:#d35400">Risco: ${info.nome}</b>
-                    `;
+                    let popupHtml = `<b style="font-size:15px; display:block;">${f.properties.Concelho}</b><img src="images/${info.img}" class="popup-img"><b style="color:#d35400">Risco: ${info.nome}</b>`;
 
                     if(m) {
+                        // Limpeza de valores undefined ou zeros suspeitos
+                        const tMax = m.tMax !== undefined ? m.tMax : "--";
+                        const tMin = m.tMin !== undefined ? m.tMin : "--";
+                        const probP = m.precipitaProb !== undefined ? m.precipitaProb : "0";
+                        // A API diária de cidades muitas vezes não traz o vento diretamente, mas se existir:
+                        const vento = m.ffWind !== undefined ? m.ffWind : "S/D"; 
+
                         popupHtml += `
                         <table class="tab-meteo">
-                            <tr><td>🌡️ Temp.</td><td>${m.tMin}º / ${m.tMax}ºC</td></tr>
-                            <tr><td>💨 Vento</td><td>${m.ffWind} km/h</td></tr>
-                            <tr><td>💧 Humidade</td><td>${m.precipitaProb}%</td></tr>
-                            <tr><td>🌧️ Precip.</td><td>${m.precipitaProb}% prob.</td></tr>
+                            <tr><td>🌡️ Temp.</td><td>${tMin}º / ${tMax}ºC</td></tr>
+                            <tr><td>💨 Vento</td><td>${vento} km/h</td></tr>
+                            <tr><td>🌧️ Prob. Chuva</td><td>${probP}%</td></tr>
                         </table>
                         <div style="font-size:9px; color:#777; margin-top:4px;">*Dados Ref: Capital de Distrito</div>`;
                     }
-
                     l.bindPopup(popupHtml);
                 }
             }
         }).addTo(map);
-
-    } catch(e) { console.error("Erro na integração de dados"); }
+    } catch(e) { console.error("Erro na integração."); }
 }
 
 const legenda = L.control({position: 'bottomright'});
