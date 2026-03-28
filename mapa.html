@@ -3,98 +3,160 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Comparativo: IPMA vs EFFIS</title>
+<title>IPMA vs EFFIS - Previsão Alargada</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
-    body { font-family: Arial; margin: 0; background: #111; color: white; overflow: hidden; }
-    #topbar { background: #222; padding: 10px; text-align: center; border-bottom: 1px solid #444; height: 60px; }
+    body { font-family: Segoe UI, Arial; margin: 0; background: #111; color: white; overflow: hidden; }
+    #topbar { background: #222; padding: 10px; text-align: center; border-bottom: 1px solid #444; height: 70px; }
     
-    /* Contentor dos mapas lado a lado */
-    #map-container { display: flex; height: calc(100vh - 80px); width: 100vw; }
+    #map-container { display: flex; height: calc(100vh - 90px); width: 100vw; }
     .map-box { width: 50%; height: 100%; border-right: 1px solid #444; position: relative; }
+    
     .label-map { 
         position: absolute; top: 10px; left: 50px; z-index: 1000; 
-        background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 4px; font-weight: bold;
+        background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 4px; 
+        font-weight: bold; border: 1px solid #555;
     }
-    #mapIPMA, #mapEFFIS { width: 100%; height: 100%; }
 
-    .legenda { background: white; padding: 8px; color: #333; font-size: 12px; line-height: 14px; }
-    .popup-img { width: 60px; height: auto; margin: 5px auto; display: block; }
+    /* Contentor dos Botões no Mapa EFFIS */
+    #controles-effis {
+        position: absolute; bottom: 20px; left: 10px; z-index: 1000;
+        background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px;
+        display: flex; flex-wrap: wrap; gap: 5px; max-width: 250px;
+    }
+    .btn-dia {
+        background: #444; color: white; border: none; padding: 5px 10px;
+        cursor: pointer; border-radius: 3px; font-size: 11px;
+    }
+    .btn-dia:hover { background: #666; }
+    .btn-dia.active { background: #ff4400; font-weight: bold; }
+
+    #mapIPMA, #mapEFFIS { width: 100%; height: 100%; background: #0f0f0f; }
+
+    .legenda { background: white; padding: 8px; color: #333; font-size: 11px; line-height: 14px; border-radius: 5px; }
 </style>
 </head>
 <body>
 
 <div id="topbar">
-    <div style="font-size: 18px; font-weight: bold;">Comparativo de Risco de Incêndio</div>
-    <div style="font-size: 12px; color: #bbb;">IPMA (Concelhos) vs EFFIS (Mancha Térmica)</div>
+    <div style="font-size: 18px; font-weight: bold;">Risco de Incêndio: Comparativo</div>
+    <div id="info-dia" style="font-size: 13px; color: #ffb400; margin-top: 5px;">EFFIS: A mostrar previsão para Hoje (D+0)</div>
 </div>
 
 <div id="map-container">
     <div class="map-box">
-        <div class="label-map">IPMA (Hoje)</div>
+        <div class="label-map">IPMA (Concelhos - Hoje)</div>
         <div id="mapIPMA"></div>
     </div>
     <div class="map-box">
-        <div class="label-map">EFFIS (Previsão D+2)</div>
+        <div class="label-map">EFFIS (Previsão Alargada)</div>
         <div id="mapEFFIS"></div>
+        
+        <div id="controles-effis">
+            <div style="width:100%; font-size:11px; margin-bottom:5px; color:#ccc;">Previsão EFFIS:</div>
+            <button class="btn-dia active" onclick="mudarDiaEFFIS(0, this)">D+0</button>
+            <button class="btn-dia" onclick="mudarDiaEFFIS(1, this)">D+1</button>
+            <button class="btn-dia" onclick="mudarDiaEFFIS(2, this)">D+2</button>
+            <button class="btn-dia" onclick="mudarDiaEFFIS(3, this)">D+3</button>
+            <button class="btn-dia" onclick="mudarDiaEFFIS(4, this)">D+4</button>
+            <button class="btn-dia" onclick="mudarDiaEFFIS(5, this)">D+5</button>
+            <button class="btn-dia" onclick="mudarDiaEFFIS(6, this)">D+6</button>
+            <button class="btn-dia" onclick="mudarDiaEFFIS(7, this)">D+7</button>
+            <button class="btn-dia" onclick="mudarDiaEFFIS(8, this)">D+8</button>
+            <button class="btn-dia" onclick="mudarDiaEFFIS(9, this)">D+9</button>
+        </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-// --- CONFIGURAÇÃO COMUM ---
-const limitesPT = [[36.8,-9.7], [42.3,-6]];
+const limitesPT = [[36.8,-10.5], [42.3,-6]];
 
 // --- MAPA 1: IPMA ---
-const mapIPMA = L.map('mapIPMA').fitBounds(limitesPT);
+const mapIPMA = L.map('mapIPMA', { zoomControl: false }).fitBounds(limitesPT);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapIPMA);
 
 // --- MAPA 2: EFFIS ---
 const mapEFFIS = L.map('mapEFFIS').fitBounds(limitesPT);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapEFFIS);
 
-// Camada WMS do EFFIS (Previsão para daqui a 2 dias - o que o IPMA não dá na API)
-const camadaEFFIS = L.tileLayer.wms("https://maps.wildfire.vgt.vito.be/gwc/service/wms", {
-    layers: 'fwi.max.d2', 
+// --- CAMADA EFFIS (CORRIGIDA) ---
+// O segredo para os dados aparecerem é usar o CRS: L.CRS.EPSG3857 (padrão) e a versão 1.1.1
+let camadaEFFIS = L.tileLayer.wms("https://maps.wildfire.vgt.vito.be/gwc/service/wms", {
+    layers: 'fwi.max.d0',
     format: 'image/png',
     transparent: true,
+    version: '1.1.1',
     opacity: 0.7,
     attribution: "© EFFIS/Copernicus"
 }).addTo(mapEFFIS);
 
-// --- SINCRONIZAÇÃO DOS MAPAS ---
-function sincronizar(e) {
-    const targetMap = (e.target === mapIPMA) ? mapEFFIS : mapIPMA;
-    targetMap.setView(e.target.getCenter(), e.target.getZoom(), { animate: false });
+function mudarDiaEFFIS(dia, btn) {
+    // Atualizar botões
+    document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Atualizar Texto
+    const textos = ["Hoje", "Amanhã", "Depois de Amanhã"];
+    let txt = dia < 3 ? textos[dia] : `Daqui a ${dia} dias`;
+    document.getElementById('info-dia').innerText = `EFFIS: A mostrar previsão para ${txt} (D+${dia})`;
+
+    // Atualizar Camada WMS
+    mapEFFIS.removeLayer(camadaEFFIS);
+    camadaEFFIS = L.tileLayer.wms("https://maps.wildfire.vgt.vito.be/gwc/service/wms", {
+        layers: `fwi.max.d${dia}`,
+        format: 'image/png',
+        transparent: true,
+        version: '1.1.1',
+        opacity: 0.7
+    }).addTo(mapEFFIS);
 }
 
-mapIPMA.on('move', sincronizar);
-mapEFFIS.on('move', sincronizar);
+// --- SINCRONIZAÇÃO (MOVIMENTO LADO A LADO) ---
+let isSyncing = false;
+mapIPMA.on('move', () => {
+    if (!isSyncing) {
+        isSyncing = true;
+        mapEFFIS.setView(mapIPMA.getCenter(), mapIPMA.getZoom(), { animate: false });
+        isSyncing = false;
+    }
+});
 
-// --- LÓGICA DE DADOS IPMA (Resumo do que já tínhamos) ---
+mapEFFIS.on('move', () => {
+    if (!isSyncing) {
+        isSyncing = true;
+        mapIPMA.setView(mapEFFIS.getCenter(), mapEFFIS.getZoom(), { animate: false });
+        isSyncing = false;
+    }
+});
+
+// --- CARREGAR DADOS IPMA (IGUAL AO ANTERIOR) ---
 async function carregarIPMA() {
-    const resp = await fetch("https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json");
-    const dados = await resp.json();
-    const riscoPorDico = {};
-    Object.values(dados.local).forEach(c => riscoPorDico[c.dico] = c.data.rcm);
+    try {
+        const resp = await fetch("https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d0.json");
+        const dados = await resp.json();
+        const riscoPorDico = {};
+        Object.values(dados.local).forEach(c => riscoPorDico[c.dico] = c.data.rcm);
 
-    const geoResp = await fetch("concelhos-simples.geojson");
-    const concelhos = await geoResp.json();
+        const geoResp = await fetch("concelhos-simples.geojson");
+        const concelhos = await geoResp.json();
 
-    L.geoJSON(concelhos, {
-        style: (f) => ({
-            fillColor: f.properties.DICO && riscoPorDico[f.properties.DICO] ? obterCor(riscoPorDico[f.properties.DICO]) : "#999",
-            weight: 1, color: "#444", fillOpacity: 0.7
-        }),
-        onEachFeature: (f, l) => {
-            const r = riscoPorDico[f.properties.DICO];
-            l.bindPopup(`<b>${f.properties.Concelho}</b><br>Risco IPMA: <b>${r || 'N/A'}</b>`);
-        }
-    }).addTo(mapIPMA);
+        L.geoJSON(concelhos, {
+            style: (f) => ({
+                fillColor: obterCor(riscoPorDico[f.properties.DICO]),
+                weight: 1, color: "#444", fillOpacity: 0.6
+            }),
+            onEachFeature: (f, l) => {
+                const r = riscoPorDico[f.properties.DICO] || "Sem dados";
+                l.bindPopup(`<b>${f.properties.Concelho}</b><br>Risco IPMA: <b>${r}</b>`);
+            }
+        }).addTo(mapIPMA);
+    } catch(e) { console.error("Erro IPMA:", e); }
 }
 
 function obterCor(r) {
-    return {1:"#00cc00", 2:"#ffff00", 3:"#ff9900", 4:"#ff3300", 5:"#990000"}[r] || "#999";
+    const cores = {1:"#00cc00", 2:"#ffff00", 3:"#ff9900", 4:"#ff3300", 5:"#990000"};
+    return cores[r] || "transparent";
 }
 
 carregarIPMA();
