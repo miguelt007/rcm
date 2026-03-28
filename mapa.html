@@ -3,180 +3,121 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>IPMA - Risco de Incêndio Rural</title>
-    
+    <title>IPMA - Risco Rural</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    
     <style>
-        /* Reset e Estrutura Base */
-        html, body { height: 100%; margin: 0; padding: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
-        
-        /* Barra de Título */
-        #topbar { 
-            background: #1a1a1a; 
-            padding: 15px; 
-            text-align: center; 
-            border-bottom: 3px solid #ff4400; 
-            z-index: 2000; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-        }
-        #titulo-principal { font-size: 22px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
-        
-        /* Contentor do Mapa */
+        html, body { height: 100%; margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; font-family: 'Segoe UI', Arial, sans-serif; }
+        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 2px solid #ff4400; z-index: 2000; }
+        #titulo-principal { font-size: 19px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
         #mapIPMA { flex-grow: 1; width: 100%; background: #050505; }
-        
-        /* Botões de Seleção de Dia */
-        .controles { 
-            position: absolute; 
-            top: 100px; 
-            left: 20px; 
-            z-index: 1000; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 10px; 
-            background: rgba(0,0,0,0.7); 
-            padding: 10px; 
-            border-radius: 8px; 
-            backdrop-filter: blur(4px);
-        }
-        .btn-dia { 
-            background: #333; 
-            color: #fff; 
-            border: 1px solid #555; 
-            padding: 12px 20px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            border-radius: 6px; 
-            transition: 0.3s;
-        }
-        .btn-dia.active { background: #ff4400; border-color: #fff; box-shadow: 0 0 10px rgba(255,68,0,0.4); }
-        .btn-dia:hover:not(.active) { background: #444; }
-
-        /* Estilo do Popup */
-        .leaflet-popup-content-wrapper { border-radius: 8px; border: 1px solid #ccc; }
-        .leaflet-popup-content { text-align: center; min-width: 210px; color: #222; margin: 15px; }
-        .tab-meteo { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; border: 1px solid #eee; }
-        .tab-meteo td { border: 1px solid #eee; padding: 6px; text-align: left; }
-        .tab-meteo td:first-child { background: #f9f9f9; font-weight: bold; color: #555; }
-        
-        /* Legenda */
-        .legend { background: rgba(255, 255, 255, 0.9); padding: 10px; border-radius: 5px; line-height: 18px; color: #333; font-weight: bold; font-size: 11px; }
-        .legend i { width: 15px; height: 15px; float: left; margin-right: 8px; border-radius: 3px; }
+        .controles { position: absolute; bottom: 30px; left: 20px; z-index: 1000; background: rgba(0,0,0,0.85); padding: 10px; border-radius: 8px; display: flex; gap: 8px; border: 1px solid #444; }
+        .btn-dia { background: #333; color: white; border: 1px solid #555; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .btn-dia.active { background: #ff4400; border-color: #fff; }
+        .leaflet-popup-content { text-align: center; color: #333; min-width: 210px; }
+        .tab-meteo { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; border: 1px solid #eee; }
+        .tab-meteo td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        .tab-meteo td:first-child { background: #f8f8f8; font-weight: bold; width: 50%; }
+        .legend { background: rgba(255, 255, 255, 0.9); padding: 10px; font-size: 11px; border-radius: 5px; font-weight: bold; }
+        .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
     </style>
 </head>
 <body>
 
-    <div id="topbar">
-        <h1 id="titulo-principal">Risco de Incêndio Rural - IPMA</h1>
-    </div>
+<div id="topbar"><p id="titulo-principal">Risco de Incêndio e Previsão</p></div>
+<div id="mapIPMA"></div>
+<div class="controles">
+    <button class="btn-dia active" onclick="mudarDia(0, this)">HOJE</button>
+    <button class="btn-dia" onclick="mudarDia(1, this)">AMANHÃ</button>
+</div>
 
-    <div class="controles">
-        <button class="btn-dia active" onclick="mudarDia(0, this)">HOJE</button>
-        <button class="btn-dia" onclick="mudarDia(1, this)">AMANHÃ</button>
-    </div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('mapIPMA').setView([39.6, -8.1], 7);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-    <div id="mapIPMA"></div>
+const infoRisco = {
+    1: { nome: "Reduzido", cor: "#00cc00" },
+    2: { nome: "Moderado", cor: "#ffff00" },
+    3: { nome: "Elevado", cor: "#ff9900" },
+    4: { nome: "Muito Elevado", cor: "#ff3300" },
+    5: { nome: "Máximo", cor: "#990000" }
+};
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+let camadaGeoJSON;
+let cacheGeoJSON = null;
 
-    <script>
-        // Inicializar Mapa
-        const map = L.map('mapIPMA').setView([39.5, -8.3], 7);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: 'IPMA | CartoDB'
-        }).addTo(map);
+async function mudarDia(dia, btn) {
+    if(btn) {
+        document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+    if (camadaGeoJSON) map.removeLayer(camadaGeoJSON);
 
-        const coresRisco = { 1: "#00cc00", 2: "#ffff00", 3: "#ff9900", 4: "#ff3300", 5: "#990000" };
-        const nomesRisco = { 1: "Reduzido", 2: "Moderado", 3: "Elevado", 4: "Muito Elevado", 5: "Máximo" };
+    // MUDANÇA DE PROXY: AllOrigins -> cors-anywhere (demo)
+    const proxy = "https://cors-anywhere.herokuapp.com/";
+    const t = new Date().getTime();
 
-        let camada;
-        let cacheGeoJSON = null;
-
-        async function mudarDia(dia, btn) {
-            // UI Update
-            if(btn) {
-                document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-            }
-
-            // Remover camada antiga
-            if (camada) map.removeLayer(camada);
-
-            const proxy = "https://api.allorigins.win/raw?url=";
-            const t = new Date().getTime();
-            const urlIPMA = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json?v=${t}`;
-
-            try {
-                // 1. Carregar Concelhos (apenas uma vez)
-                if (!cacheGeoJSON) {
-                    const rGeo = await fetch("concelhos-simples.geojson");
-                    cacheGeoJSON = await rGeo.json();
-                }
-
-                // 2. Carregar Dados IPMA
-                const resp = await fetch(proxy + encodeURIComponent(urlIPMA));
-                const jsonIPMA = await resp.json();
-                const dadosMap = jsonIPMA.local;
-
-                // 3. Criar Camada de Dados
-                camada = L.geoJSON(cacheGeoJSON, {
-                    style: (f) => {
-                        // Formatar DICO para 4 dígitos (ex: 1106)
-                        const dico = String(f.properties.DICO).padStart(4, '0');
-                        const rcmVal = (dadosMap[dico] && dadosMap[dico].data) ? dadosMap[dico].data.rcm : null;
-                        
-                        return {
-                            fillColor: rcmVal ? coresRisco[rcmVal] : "#444",
-                            weight: 1,
-                            color: "#666",
-                            fillOpacity: 0.7
-                        };
-                    },
-                    onEachFeature: (f, l) => {
-                        const dico = String(f.properties.DICO).padStart(4, '0');
-                        const info = dadosMap[dico];
-
-                        if (info && info.data) {
-                            const d = info.data;
-                            let popupContent = `
-                                <div style="font-size:16px; border-bottom:2px solid #eee; padding-bottom:5px; margin-bottom:10px;">
-                                    <b>${f.properties.Concelho || "Desconhecido"}</b>
-                                </div>
-                                <div style="font-weight:bold; color:${coresRisco[d.rcm]}; font-size:14px; text-transform:uppercase;">
-                                    Risco ${nomesRisco[d.rcm]}
-                                </div>
-                                <table class="tab-meteo">
-                                    <tr><td>🌡️ Temp. Máx</td><td>${d.tMax}ºC</td></tr>
-                                    <tr><td>🌡️ Temp. Mín</td><td>${d.tMin}ºC</td></tr>
-                                    <tr><td>💧 Humid. Mín</td><td>${d.hrMin}%</td></tr>
-                                    <tr><td>💨 Vento</td><td>${d.ff_dir_id} (${d.ff_int_id})</td></tr>
-                                </table>
-                                <div style="font-size:9px; color:#888; margin-top:8px;">Código Concelho: ${dico}</div>
-                            `;
-                            l.bindPopup(popupContent);
-                        }
-                    }
-                }).addTo(map);
-
-            } catch (err) {
-                console.error("Erro ao carregar dados:", err);
-            }
+    try {
+        // PASSO 1: Carregar GeoJSON local (Prioridade Máxima)
+        if (!cacheGeoJSON) {
+            cacheGeoJSON = await fetch("concelhos-simples.geojson").then(r => r.json());
         }
 
-        // Legenda
-        const legenda = L.control({position: 'bottomright'});
-        legenda.onAdd = function() {
-            const div = L.DomUtil.create('div', 'legend');
-            div.innerHTML = '<b>RISCO IPMA</b><br><br>';
-            for (let i in coresRisco) {
-                div.innerHTML += `<i style="background:${coresRisco[i]}"></i> ${nomesRisco[i]}<br>`;
-            }
-            return div;
-        };
-        legenda.addTo(map);
+        // PASSO 2: Carregar Dados IPMA (Se o proxy falhar, riscMap ficará vazio)
+        let dadosMap = {};
+        try {
+            const urlR = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json?v=${t}`;
+            const resR = await fetch(proxy + urlR).then(r => r.json());
+            dadosMap = resR.local;
+        } catch(e) { console.error("Falha ao carregar dados IPMA via Proxy"); }
 
-        // Iniciar
-        mudarDia(0);
-    </script>
+        // PASSO 3: Desenhar o Mapa
+        camadaGeoJSON = L.geoJSON(cacheGeoJSON, {
+            style: (f) => {
+                const dico = String(f.properties.DICO); // Já tem 4 dígitos
+                const rcmVal = (dadosMap[dico] && dadosMap[dico].data) ? dadosMap[dico].data.rcm : null;
+                return {
+                    fillColor: rcmVal ? infoRisco[rcmVal].cor : "#333", // Se o IPMA falhar, fica cinzento
+                    weight: 1, color: "#444", fillOpacity: 0.7
+                };
+            },
+            onEachFeature: (f, l) => {
+                const dico = String(f.properties.DICO);
+                const infoLocal = dadosMap[dico];
+
+                if(infoLocal && infoLocal.data) {
+                    const d = infoLocal.data;
+                    const r = infoRisco[d.rcm];
+                    let content = `<b>${f.properties.Concelho}</b><br>
+                                   <b style="color:${r.cor}">Risco: ${r.nome}</b>
+                                   <table class="tab-meteo">
+                                       <tr><td>🌡️ Temp. Máx</td><td>${d.tMax}ºC</td></tr>
+                                       <tr><td>💧 Humid. Mín</td><td>${d.hrMin}%</td></tr>
+                                       <tr><td>💨 Vento</td><td>Dir: ${d.ff_dir_id}</td></tr>
+                                   </table>`;
+                    l.bindPopup(content);
+                } else {
+                    l.bindPopup(`<b>${f.properties.Concelho}</b><br><small style="color:red">IPMA offline (Proxy falhou)</small>`);
+                }
+            }
+        }).addTo(map);
+
+    } catch(err) {
+        console.error("Erro crítico:", err);
+        alert("O mapa não conseguiu carregar. Verifica se o ficheiro 'concelhos-simples.geojson' existe!");
+    }
+}
+
+const legenda = L.control({position: 'bottomright'});
+legenda.onAdd = () => {
+    const div = L.DomUtil.create('div', 'legend');
+    div.innerHTML = '<b>Risco IPMA</b><br>';
+    for (let i in infoRisco) div.innerHTML += `<i style="background:${infoRisco[i].cor}"></i> ${infoRisco[i].nome}<br>`;
+    return div;
+};
+legenda.addTo(map);
+
+mudarDia(0);
+</script>
 </body>
 </html>
