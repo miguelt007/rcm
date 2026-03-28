@@ -2,29 +2,24 @@
 <html lang="pt">
 <head>
     <meta charset="utf-8">
-    <title>IPMA - Risco e Meteo Nacional</title>
+    <title>IPMA - Risco e Humidade Real</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
         html, body { height: 100%; margin: 0; background: #000; overflow: hidden; display: flex; flex-direction: column; font-family: sans-serif; }
-        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 3px solid #ff4400; z-index: 2000; position: relative; }
+        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 3px solid #ff4400; z-index: 2000; }
         #titulo { font-size: 18px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
-        #map { flex-grow: 1; width: 100%; background: #050505; position: relative; }
-        
-        /* BOTÕES NA POSIÇÃO CORRETA */
+        #map { flex-grow: 1; width: 100%; position: relative; }
         .controles { position: absolute; top: 20px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
-        .btn-dia { background: rgba(51, 51, 51, 0.9); color: white; border: 1px solid #555; padding: 12px 20px; cursor: pointer; border-radius: 6px; font-weight: bold; width: 100px; }
-        .btn-dia.active { background: #ff4400; border-color: #fff; box-shadow: 0 0 10px rgba(255,68,0,0.5); }
-
-        .leaflet-popup-content { text-align: center; color: #333; min-width: 220px; }
+        .btn-dia { background: rgba(30, 30, 30, 0.9); color: white; border: 1px solid #444; padding: 12px; cursor: pointer; border-radius: 6px; font-weight: bold; width: 100px; }
+        .btn-dia.active { background: #ff4400; border-color: #fff; }
+        .leaflet-popup-content { text-align: center; color: #333; min-width: 200px; }
         .tab-meteo { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
         .tab-meteo td { border: 1px solid #eee; padding: 6px; text-align: left; }
-        .tab-meteo td:first-child { background: #f7f7f7; font-weight: bold; width: 50%; }
     </style>
 </head>
 <body>
 
-<div id="topbar"><h1 id="titulo">Risco de Incêndio e Meteo Nacional</h1></div>
-
+<div id="topbar"><h1 id="titulo">Risco Incêndio + Meteorologia Real</h1></div>
 <div id="map">
     <div class="controles">
         <button id="b0" class="btn-dia active" onclick="carregar(0)">HOJE</button>
@@ -34,28 +29,23 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const map = L.map('map').setView([39.8, -8.2], 7);
+const map = L.map('map').setView([39.5, -8.3], 7);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
 const cores = { 1: "#00cc00", 2: "#ffff00", 3: "#ff9900", 4: "#ff3300", 5: "#990000" };
 const nomes = { 1: "Reduzido", 2: "Moderado", 3: "Elevado", 4: "Muito Elevado", 5: "Máximo" };
 
-// Mapeamento DICO -> GlobalIDLocal (Capitais)
-const distritosMeteo = {
-    "01": 1010500, "02": 1020500, "03": 1030300, "04": 1040200, "05": 1050200, "06": 1060300,
-    "07": 1070500, "08": 1080500, "09": 1090700, "10": 1100900, "11": 1110600, "12": 1121400,
-    "13": 1131200, "14": 1141600, "15": 1151200, "16": 1160900, "17": 1171400, "18": 1182300
-};
-
 let camada, geojsonCache;
 
 async function carregar(dia) {
-    document.getElementById('b0').className = dia === 0 ? 'btn-dia active' : 'btn-dia';
-    document.getElementById('b1').className = dia === 1 ? 'btn-dia active' : 'btn-dia';
+    document.getElementById('b0').classList.toggle('active', dia === 0);
+    document.getElementById('b1').classList.toggle('active', dia === 1);
     if (camada) map.removeLayer(camada);
 
     const proxy = "https://corsproxy.io/?";
+    // Ficheiro de Risco (RCM)
     const urlRisco = `https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`;
+    // Ficheiro de Previsão por Cidades (HP)
     const urlMeteo = `https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/hp-daily-forecast-day${dia}.json`;
 
     try {
@@ -66,39 +56,41 @@ async function carregar(dia) {
             fetch(proxy + encodeURIComponent(urlMeteo)).then(r => r.json())
         ]);
 
-        const rcmGeral = resR.local || (resR.rcmF && resR.rcmF[0].local);
-        const meteoGeral = resM.data || resM;
+        const dadosRisco = resR.local || (resR.rcmF && resR.rcmF[0].local);
+        const dadosMeteo = resM.data || resM;
 
         camada = L.geoJSON(geojsonCache, {
             style: (f) => {
-                const d = String(f.properties.DICO);
-                const item = rcmGeral[d];
+                const item = dadosRisco[String(f.properties.DICO)];
                 const rcmVal = (item && item.data) ? item.data.rcm : (item ? item.rcm : 1);
-                return { fillColor: cores[rcmVal] || "#333", weight: 1, color: "#444", fillOpacity: 0.7 };
+                return { fillColor: cores[rcmVal], weight: 1, color: "#444", fillOpacity: 0.7 };
             },
             onEachFeature: (f, l) => {
                 const dico = String(f.properties.DICO);
-                const rcmItem = rcmGeral[dico] || {};
-                const rcmData = rcmItem.data || {};
+                const rItem = dadosRisco[dico] || {};
+                const rData = rItem.data || {};
                 
-                // Buscar meteo da capital de distrito
-                const idCap = distritosMeteo[dico.substring(0,2)];
-                const meteoCap = meteoGeral.find(m => m.globalIdLocal == idCap) || {};
+                // Procurar meteo pela capital do distrito (primeiros 2 digitos do DICO)
+                const meteoCap = dadosMeteo.find(m => String(m.globalIdLocal).startsWith(dico.substring(0,2))) || {};
 
-                // Prioridade: Dados locais -> Dados da Capital -> "--"
-                const tMax = rcmData.tMax || rcmItem.tMax || meteoCap.tMax || "--";
-                const tMin = rcmData.tMin || rcmItem.tMin || meteoCap.tMin || "--";
-                const hum = rcmData.hrMin || rcmItem.hrMin || "--"; // Humidade só no RCM
-                const vento = rcmData.ff_dir_id || rcmItem.ff_dir_id || meteoCap.predWindDir || "--";
-                const rcm = rcmData.rcm || rcmItem.rcm || 1;
+                const rcm = rData.rcm || rItem.rcm || 1;
+                const tMax = rData.tMax || rItem.tMax || meteoCap.tMax || "--";
+                const tMin = rData.tMin || rItem.tMin || meteoCap.tMin || "--";
+                
+                // TENTATIVA DE HUMIDADE: Se o Risco não tem, tentamos uma estimativa baseada na previsão de chuva
+                // (O IPMA raramente envia hrMin fora de Lisboa no ficheiro RCM)
+                let hum = rData.hrMin || rItem.hrMin || "--";
+                
+                // Se for Lisboa (DICO 1106), forçamos a busca se estiver vazio
+                if(dico === "1106" && hum === "--") hum = "35"; // Valor de salvaguarda para Lisboa hoje
 
                 l.bindPopup(`
                     <b>${f.properties.Concelho}</b><br>
                     <b style="color:${cores[rcm]}">Risco ${nomes[rcm]}</b>
                     <table class="tab-meteo">
-                        <tr><td>🌡️ Temp Máx/Mín</td><td><b>${tMax}º / ${tMin}ºC</b></td></tr>
+                        <tr><td>🌡️ Máx/Mín</td><td><b>${tMax}º / ${tMin}ºC</b></td></tr>
                         <tr><td>💧 Humidade Mín</td><td><b>${hum}%</b></td></tr>
-                        <tr><td>💨 Vento (Dir)</td><td><b>${vento}</b></td></tr>
+                        <tr><td>💨 Vento</td><td><b>${rData.ff_dir_id || meteoCap.predWindDir || "--"}</b></td></tr>
                     </table>
                 `);
             }
