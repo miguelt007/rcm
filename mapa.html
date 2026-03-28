@@ -3,14 +3,12 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Monitorização IPMA - Risco e Meteorologia</title>
+    <title>IPMA - Risco e Meteorologia</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #000; color: white; overflow: hidden; }
-        #topbar { background: #1a1a1a; padding: 10px; text-align: center; border-bottom: 2px solid #333; height: 85px; box-sizing: border-box; }
-        #titulo-principal { font-size: 20px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
-        #subtitulo { font-size: 13px; color: #aaa; margin-top: 5px; }
-
+        #topbar { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 2px solid #333; height: 85px; box-sizing: border-box; }
+        #titulo-principal { font-size: 18px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
         #mapIPMA { width: 100vw; height: calc(100vh - 85px); background: #050505; }
         
         .controles {
@@ -20,24 +18,22 @@
         }
         .btn-dia { 
             background: #333; color: white; border: 1px solid #555; padding: 8px 12px; 
-            cursor: pointer; border-radius: 4px; font-size: 12px; font-weight: bold;
+            cursor: pointer; border-radius: 4px; font-size: 11px; font-weight: bold;
         }
         .btn-dia.active { background: #ff4400; border-color: #fff; }
 
-        .legend { background: rgba(255, 255, 255, 0.9); padding: 10px; color: #111; font-size: 11px; border-radius: 5px; font-weight: bold; line-height: 1.5; }
+        .legend { background: rgba(255, 255, 255, 0.9); padding: 10px; color: #111; font-size: 11px; border-radius: 5px; font-weight: bold; }
         .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
 
-        /* Estilo do Popup */
-        .leaflet-popup-content { text-align: center; color: #333; min-width: 150px; }
-        .popup-img { width: 90px; height: auto; margin: 10px auto; display: block; }
-        .meteo-info { margin-top: 8px; padding-top: 8px; border-top: 1px solid #ccc; font-size: 13px; text-align: left; }
+        .leaflet-popup-content { text-align: center; color: #333; line-height: 1.5; min-width: 160px; }
+        .popup-img { width: 85px; height: auto; margin: 10px auto; display: block; }
+        .meteo-box { border-top: 1px solid #ddd; margin-top: 8px; padding-top: 8px; text-align: left; font-size: 13px; }
     </style>
 </head>
 <body>
 
 <div id="topbar">
-    <p id="titulo-principal">Monitorização de Risco de Incêndio (IPMA)</p>
-    <p id="subtitulo">Dados oficiais por concelho com informação meteorológica</p>
+    <p id="titulo-principal">Risco de Incêndio e Meteorologia (IPMA)</p>
 </div>
 
 <div id="mapIPMA"></div>
@@ -52,10 +48,7 @@
 <script>
 const limitesPT = [[36.8,-10.5], [42.3,-6]];
 const map = L.map('mapIPMA').fitBounds(limitesPT);
-
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
 const infoRiscoIPMA = {
     1: { nome: "Reduzido", cor: "#00cc00", img: "Reduzido-2022.svg" },
@@ -75,74 +68,77 @@ async function mudarDia(dia, btn) {
     if (camadaGeoJSON) map.removeLayer(camadaGeoJSON);
 
     try {
-        // 1. Obter Risco de Incêndio
-        const respRisco = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d' + dia + '.json')}`).then(r => r.json());
-        const dadosRisco = JSON.parse(respRisco.contents);
-
-        // 2. Obter Meteorologia por Concelho (D0, D1 ou D2)
-        const respMeteo = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/hp-daily-forecast-day' + dia + '.json')}`).then(r => r.json());
-        const dadosMeteo = JSON.parse(respMeteo.contents);
-
-        // 3. Obter GeoJSON
-        const geo = await fetch("concelhos-simples.geojson").then(r => r.json());
+        const proxy = "https://api.allorigins.win/get?url=";
         
-        const riscoPorDico = {};
-        Object.values(dadosRisco.local).forEach(c => riscoPorDico[c.dico] = c.data.rcm);
+        // Pedido 1: Risco de Incêndio (por DICO)
+        const resRisco = await fetch(proxy + encodeURIComponent(`https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d${dia}.json`)).then(r => r.json());
+        const dadosRisco = JSON.parse(resRisco.contents);
 
-        const meteoPorGlobalId = {};
-        dadosMeteo.data.forEach(m => { meteoPorGlobalId[m.globalIdLocal] = m; });
+        // Pedido 2: Meteorologia (Cidades/Concelhos)
+        const resMeteo = await fetch(proxy + encodeURIComponent(`https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/hp-daily-forecast-day${dia}.json`)).then(r => r.json());
+        const dadosMeteo = JSON.parse(resMeteo.contents);
+
+        // Pedido 3: Local GeoJSON
+        const geo = await fetch("concelhos-simples.geojson").then(r => r.json());
+
+        // Mapear Risco
+        const riscoMap = {};
+        Object.values(dadosRisco.local).forEach(c => { riscoMap[c.dico] = c.data.rcm; });
+
+        // Mapear Meteorologia pelo nome (Normalizado para MAIÚSCULAS)
+        const meteoMap = {};
+        dadosMeteo.data.forEach(m => {
+            // O IPMA envia GlobalID, mas como o teu GeoJSON não tem, tentamos associar pelo nome se necessário
+            // Nota: Para precisão total, o ideal seria o GlobalID, mas vamos usar o que temos
+            meteoMap[m.globalIdLocal] = m; 
+        });
 
         camadaGeoJSON = L.geoJSON(geo, {
             style: (f) => ({ 
-                fillColor: riscoPorDico[f.properties.DICO] ? infoRiscoIPMA[riscoPorDico[f.properties.DICO]].cor : "transparent", 
+                fillColor: riscoMap[f.properties.DICO] ? infoRiscoIPMA[riscoMap[f.properties.DICO]].cor : "transparent", 
                 weight: 1, color: "#444", fillOpacity: 0.6 
             }),
             onEachFeature: (f, l) => {
-                const r = riscoPorDico[f.properties.DICO];
-                const m = meteoPorGlobalId[f.properties.GLOBALID]; // Usamos o GlobalID que deve estar no GeoJSON
+                const r = riscoMap[f.properties.DICO];
+                // Tentativa de link pela GlobalID se existir no GeoJSON, senão fica vazio por agora
+                // Se o teu ficheiro tiver campo GLOBALID, ele vai ler aqui:
+                const m = meteoMap[f.properties.GLOBALID]; 
 
                 if(r) {
                     const info = infoRiscoIPMA[r];
-                    let popupContent = `
+                    let popupHtml = `
                         <div style="padding:5px;">
-                            <b style="font-size:16px; display:block; margin-bottom:5px;">${f.properties.Concelho}</b>
+                            <b style="font-size:15px; display:block;">${f.properties.Concelho}</b>
                             <img src="images/${info.img}" class="popup-img">
-                            <span style="font-size:14px;"><b>Risco: ${info.nome}</b></span>
+                            <b>Risco: ${info.nome}</b>
                     `;
 
-                    // Adicionar dados meteorológicos se existirem para este concelho
                     if(m) {
-                        popupContent += `
-                            <div class="meteo-info">
-                                🌡️ <b>T. Máxima:</b> ${m.tMax}ºC<br>
-                                🌡️ <b>T. Mínima:</b> ${m.tMin}ºC<br>
-                                💧 <b>Humidade:</b> ${m.precipitaProb}%
+                        popupHtml += `
+                            <div class="meteo-box">
+                                🌡️ <b>Máx:</b> ${m.tMax}ºC | <b>Mín:</b> ${m.tMin}ºC<br>
+                                💧 <b>Chuva:</b> ${m.precipitaProb}%
                             </div>
                         `;
                     }
-
-                    popupContent += `</div>`;
-                    l.bindPopup(popupContent);
+                    
+                    popupHtml += `</div>`;
+                    l.bindPopup(popupHtml);
                 }
             }
         }).addTo(map);
-
-    } catch(e) { console.error("Erro ao carregar dados", e); }
+    } catch(e) { console.error(e); }
 }
 
-// LEGENDA
 const legenda = L.control({position: 'bottomright'});
 legenda.onAdd = () => {
     const div = L.DomUtil.create('div', 'legend');
-    div.innerHTML = '<b>Risco de Incêndio</b><br>';
-    for (let i in infoRiscoIPMA) {
-        div.innerHTML += `<i style="background:${infoRiscoIPMA[i].cor}"></i> ${infoRiscoIPMA[i].nome}<br>`;
-    }
+    div.innerHTML = '<b>Risco IPMA</b><br>';
+    for (let i in infoRiscoIPMA) div.innerHTML += `<i style="background:${infoRiscoIPMA[i].cor}"></i> ${infoRiscoIPMA[i].nome}<br>`;
     return div;
 };
 legenda.addTo(map);
 
-// Iniciar
 mudarDia(0);
 </script>
 </body>
