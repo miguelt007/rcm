@@ -7,9 +7,12 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #000; color: white; overflow: hidden; }
+        
+        /* Barra de Topo Recuperada */
         #topbar { background: #1a1a1a; padding: 10px; text-align: center; border-bottom: 2px solid #333; height: 85px; box-sizing: border-box; }
         #titulo-principal { font-size: 18px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
-        
+        #subtitulo { font-size: 12px; color: #aaa; margin-top: 5px; }
+
         #map-container { display: flex; height: calc(100vh - 85px); width: 100vw; }
         .map-box { width: 50%; height: 100%; border-right: 1px solid #333; position: relative; }
         
@@ -19,35 +22,32 @@
             font-weight: bold; border: 1px solid #444; font-size: 12px;
         }
 
-        /* Seletores de Dias */
         .controles {
             position: absolute; bottom: 20px; left: 10px; z-index: 1000;
             background: rgba(0,0,0,0.9); padding: 8px; border-radius: 8px;
-            display: flex; flex-wrap: wrap; gap: 4px; border: 1px solid #444; max-width: 200px;
+            display: flex; flex-wrap: wrap; gap: 4px; border: 1px solid #444; max-width: 220px;
         }
         .btn-dia { 
             background: #333; color: white; border: 1px solid #555; padding: 4px 6px; 
-            cursor: pointer; border-radius: 3px; font-size: 10px; min-width: 32px;
+            cursor: pointer; border-radius: 3px; font-size: 10px; min-width: 35px;
         }
         .btn-dia.active { background: #ff4400; font-weight: bold; border-color: #fff; }
 
-        /* Legendas */
         .legend { background: rgba(255, 255, 255, 0.9); padding: 8px; color: #111; font-size: 10px; border-radius: 5px; font-weight: bold; }
         .legend i { width: 14px; height: 14px; float: left; margin-right: 6px; border-radius: 2px; }
 
         #mapIPMA, #mapEFFIS { width: 100%; height: 100%; background: #050505; }
-        .popup-img { width: 80px; height: auto; margin: 8px auto; display: block; }
+        .popup-img { width: 85px; height: auto; margin: 8px auto; display: block; border-radius: 4px; }
         
-        /* Correção do PopUp */
-        .leaflet-popup-content-wrapper { color: #333; text-align: center; }
-        .leaflet-popup-content b { font-weight: bold; }
+        /* Estilo do Popup */
+        .leaflet-popup-content { text-align: center; color: #333; line-height: 1.4; }
     </style>
 </head>
 <body>
 
 <div id="topbar">
-    <p id="titulo-principal">Risco de Incêndio: IPMA vs COPERNICUS</p>
-    <div style="font-size: 12px; color: #aaa; margin-top: 5px;">Sincronizado: Arraste um mapa para mover o outro</div>
+    <p id="titulo-principal">MONITORIZAÇÃO DE RISCO DE INCÊNDIO: IPMA vs EFFIS</p>
+    <p id="subtitulo">Sincronizado: Arraste um mapa para navegar em ambos</p>
 </div>
 
 <div id="map-container">
@@ -94,17 +94,20 @@ const infoRiscoIPMA = {
     5: { nome: "Máximo", cor: "#990000", img: "Maximo-2022.svg" }
 };
 
-// --- NOVA LÓGICA EFFIS (COM CORS PROXY) ---
-// Usamos o corsproxy.io para contornar o bloqueio do Copernicus
+// --- EFFIS COM PROXY PARA EVITAR BLOQUEIO DE DADOS ---
 function getEffisUrl(dia) {
-    const baseUrl = `https://fwi-forecast.jrc.ec.europa.eu/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=fwi_max_d${dia}&STYLES=fwi_max_fixed&FORMAT=image/png&TRANSPARENT=TRUE&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox}`;
-    return `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`;
+    const wmsUrl = `https://fwi-forecast.jrc.ec.europa.eu/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=fwi_max_d${dia}&STYLES=fwi_max_fixed&FORMAT=image/png&TRANSPARENT=TRUE&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox}`;
+    return `https://api.allorigins.win/get?url=${encodeURIComponent(wmsUrl)}`;
 }
 
-let camadaEFFIS = L.tileLayer(getEffisUrl(0), {
+// Devido à complexidade do EFFIS, usamos o WMS direto que é mais fiável se o servidor estiver aberto
+let camadaEFFIS = L.tileLayer.wms("https://fwi-forecast.jrc.ec.europa.eu/wms", {
+    layers: 'fwi_max_d0',
+    format: 'image/png',
+    transparent: true,
+    version: '1.3.0',
     opacity: 0.7,
-    attribution: '© EFFIS/Copernicus',
-    tileSize: 256
+    styles: 'fwi_max_fixed'
 }).addTo(mapEFFIS);
 
 function mudarDiaEFFIS(dia, btn) {
@@ -112,13 +115,17 @@ function mudarDiaEFFIS(dia, btn) {
     btn.classList.add('active');
     document.getElementById('label-effis').innerText = `EFFIS: Previsão D+${dia}`;
     mapEFFIS.removeLayer(camadaEFFIS);
-    camadaEFFIS = L.tileLayer(getEffisUrl(dia), { 
+    camadaEFFIS = L.tileLayer.wms("https://fwi-forecast.jrc.ec.europa.eu/wms", {
+        layers: `fwi_max_d${dia}`,
+        format: 'image/png',
+        transparent: true,
+        version: '1.3.0',
         opacity: 0.7,
-        tileSize: 256
+        styles: 'fwi_max_fixed'
     }).addTo(mapEFFIS);
 }
 
-// --- LOGICA IPMA (COM ALLORIGINS PROXY) ---
+// --- IPMA ---
 let camadaGeoJSON;
 async function mudarDiaIPMA(dia, btn) {
     if(btn) {
@@ -146,12 +153,18 @@ async function mudarDiaIPMA(dia, btn) {
                 const r = riscoPorDico[f.properties.DICO];
                 if(r) {
                     const info = infoRiscoIPMA[r];
-                    // CORREÇÃO: Adicionada tag <b> no Risco
-                    l.bindPopup(`<div style="padding:5px;"><b style="font-size:15px; display:block;">${f.properties.Concelho}</b><img src="images/${info.img}" class="popup-img"><b>Risco: ${info.nome}</b></div>`);
+                    // POPUP CORRIGIDO COM NEGRITO
+                    l.bindPopup(`
+                        <div style="padding:5px;">
+                            <b style="font-size:15px; display:block;">${f.properties.Concelho}</b>
+                            <img src="images/${info.img}" class="popup-img">
+                            <span style="font-size:14px;"><b>Risco: ${info.nome}</b></span>
+                        </div>
+                    `);
                 }
             }
         }).addTo(mapIPMA);
-    } catch(e) { console.error("Erro IPMA"); }
+    } catch(e) { console.error("Erro IPMA", e); }
 }
 
 // SINCRONIZAÇÃO
