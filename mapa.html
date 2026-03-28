@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>IPMA vs EFFIS - Monitorização de Risco</title>
+    <title>IPMA vs EFFIS - Oficial</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         body { font-family: 'Segoe UI', Arial; margin: 0; background: #000; color: white; overflow: hidden; }
@@ -38,14 +38,17 @@
         .btn-dia.active { background: #ff4400; font-weight: bold; }
 
         #mapIPMA, #mapEFFIS { width: 100%; height: 100%; background: #050505; }
-        .popup-img { width: 80px; height: auto; display: block; margin: 5px auto; }
+        
+        /* Estilo do Popup solicitado */
+        .leaflet-popup-content { color: #333; text-align: center; line-height: 1.4; }
+        .popup-img { width: 80px; height: auto; margin: 10px 0; display: block; margin-left: auto; margin-right: auto; }
     </style>
 </head>
 <body>
 
 <div id="topbar">
     <div style="font-size: 18px; font-weight: bold; color: #ff4400;">RISCO DE INCÊNDIO: COMPARATIVO</div>
-    <div id="info-dia" style="font-size: 12px; color: #bbb;">IPMA (Oficial) | EFFIS (Previsão Alargada)</div>
+    <div id="info-dia" style="font-size: 12px; color: #bbb;">IPMA (Oficial Hoje) | EFFIS (Previsão Alargada)</div>
 </div>
 
 <div id="map-container">
@@ -75,29 +78,29 @@
 <script>
 // --- CONFIGURAÇÃO ---
 const limitesPT = [[36.8,-10.5], [42.3,-6]];
-const mapIPMA = L.map('mapIPMA', { zoomControl: true }).fitBounds(limitesPT);
+const mapIPMA = L.map('mapIPMA').fitBounds(limitesPT);
 const mapEFFIS = L.map('mapEFFIS', { zoomControl: false }).fitBounds(limitesPT);
 
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapIPMA);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapEFFIS);
 
-// --- CORES E NOMES ---
-const niveisRisco = {
-    1: { nome: "Reduzido", cor: "#00cc00", img: "reduzido.svg" },
-    2: { nome: "Moderado", cor: "#ffff00", img: "moderado.svg" },
-    3: { nome: "Elevado", cor: "#ff9900", img: "elevado.svg" },
-    4: { nome: "Muito Elevado", cor: "#ff3300", img: "muito_elevado.svg" },
-    5: { nome: "Máximo", cor: "#990000", img: "maximo.svg" }
+// --- MAPEAMENTO DE RISCO ORIGINAL ---
+const infoRisco = {
+    1: { nome: "Reduzido", cor: "#00cc00", img: "Reduzido-2022.svg" },
+    2: { nome: "Moderado", cor: "#ffff00", img: "Moderado-2022.svg" },
+    3: { nome: "Elevado", cor: "#ff9900", img: "Elevado-2022.svg" },
+    4: { nome: "Muito Elevado", cor: "#ff3300", img: "MuitoElevado-2022.svg" },
+    5: { nome: "Máximo", cor: "#990000", img: "Maximo-2022.svg" }
 };
 
-// --- EFFIS LAYER ---
+// --- EFFIS LAYER (URL CORRIGIDO PARA MOSTRAR DADOS) ---
 let camadaEFFIS = L.tileLayer.wms("https://maps.wildfire.vgt.vito.be/gwc/service/wms", {
     layers: 'fwi.max.d0',
     format: 'image/png',
     transparent: true,
     version: '1.1.1',
-    opacity: 0.7,
-    styles: 'fwi.max.fixed' // Tenta forçar o estilo de cores do EFFIS
+    opacity: 0.8,
+    styles: 'fwi_max_fixed'
 }).addTo(mapEFFIS);
 
 function mudarDiaEFFIS(dia, btn) {
@@ -109,22 +112,22 @@ function mudarDiaEFFIS(dia, btn) {
         format: 'image/png',
         transparent: true,
         version: '1.1.1',
-        opacity: 0.7,
-        styles: 'fwi.max.fixed'
+        opacity: 0.8,
+        styles: 'fwi_max_fixed'
     }).addTo(mapEFFIS);
 }
 
 // --- SINCRONIZAÇÃO ---
 mapIPMA.on('drag zoom', () => mapEFFIS.setView(mapIPMA.getCenter(), mapIPMA.getZoom(), {animate:false}));
-mapEFFIS.on('drag zoom', () => mapIPMA.setView(mapEFFIS.getCenter(), mapEFFIS.getZoom(), {animate:false}));
+mapEFFIS.on('drag zoom', () => mapIPMA.setView(mapEFFIS.getCenter(), mapIPMA.getZoom(), {animate:false}));
 
-// --- LEGENDA IPMA ---
+// --- LEGENDA IPMA COMPLETA ---
 const legIPMA = L.control({position: 'bottomleft'});
 legIPMA.onAdd = function() {
     const div = L.DomUtil.create('div', 'legend');
     div.innerHTML = '<b>Risco IPMA</b><br>';
-    for (let i in niveisRisco) {
-        div.innerHTML += `<i style="background:${niveisRisco[i].cor}"></i> ${niveisRisco[i].nome}<br>`;
+    for (let i in infoRisco) {
+        div.innerHTML += `<i style="background:${infoRisco[i].cor}"></i> ${infoRisco[i].nome}<br>`;
     }
     return div;
 };
@@ -135,15 +138,28 @@ const legEFFIS = L.control({position: 'bottomright'});
 legEFFIS.onAdd = function() {
     const div = L.DomUtil.create('div', 'legend');
     div.innerHTML = '<b>Escala FWI (EFFIS)</b><br>' +
-        '<i style="background:#0000ff"></i> 0 - 5.2 (Muito Baixo)<br>' +
-        '<i style="background:#00ffff"></i> 5.2 - 10.5 (Baixo)<br>' +
-        '<i style="background:#00ff00"></i> 10.5 - 21.3 (Médio)<br>' +
-        '<i style="background:#ffff00"></i> 21.3 - 38.0 (Alto)<br>' +
-        '<i style="background:#ff9900"></i> 38.0 - 50.0 (Muito Alto)<br>' +
-        '<i style="background:#ff0000"></i> > 50.0 (Extremo)';
+        '<i style="background:#0000ff"></i> Muito Baixo<br>' +
+        '<i style="background:#00ff00"></i> Médio<br>' +
+        '<i style="background:#ffff00"></i> Alto<br>' +
+        '<i style="background:#ff9900"></i> Muito Alto<br>' +
+        '<i style="background:#ff0000"></i> Extremo';
     return div;
 };
 legEFFIS.addTo(mapEFFIS);
+
+// --- FUNÇÃO PARA GERAR POPUP SOLICITADO ---
+function criarConteudoPopup(nomeConcelho, riscoNum) {
+    const info = infoRisco[riscoNum];
+    if(!info) return `<b>${nomeConcelho}</b><br>Sem dados`;
+    
+    return `
+        <div style="padding: 5px;">
+            <b style="font-size:16px; display:block;">${nomeConcelho}</b>
+            <img src="images/${info.img}" alt="${info.nome}" class="popup-img">
+            <span style="font-size:14px;"><b>Risco: ${info.nome}</b></span>
+        </div>
+    `;
+}
 
 // --- CARREGAR IPMA ---
 async function carregarIPMA() {
@@ -159,23 +175,17 @@ async function carregarIPMA() {
         L.geoJSON(geo, {
             style: (f) => {
                 const r = riscoPorDico[f.properties.DICO];
-                return { fillColor: r ? niveisRisco[r].cor : "transparent", weight: 1, color: "#444", fillOpacity: 0.6 };
+                return { 
+                    fillColor: r ? infoRisco[r].cor : "transparent", 
+                    weight: 1, color: "#444", fillOpacity: 0.6 
+                };
             },
             onEachFeature: (f, l) => {
                 const r = riscoPorDico[f.properties.DICO];
-                if(r) {
-                    const info = niveisRisco[r];
-                    l.bindPopup(`
-                        <div style="text-align:center">
-                            <b>${f.properties.Concelho}</b><br>
-                            ${info.nome}<br>
-                            <img src="${info.img}" class="popup-img">
-                        </div>
-                    `);
-                }
+                l.bindPopup(criarConteudoPopup(f.properties.Concelho, r));
             }
         }).addTo(mapIPMA);
-    } catch(e) { console.error("Erro carregamento"); }
+    } catch(e) { console.error("Erro carregamento IPMA"); }
 }
 
 carregarIPMA();
