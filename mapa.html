@@ -112,7 +112,6 @@ select{ font-size:14px; }
 
 const map = L.map('map');
 
-// centralizar em Portugal (continente + ilhas)
 map.fitBounds([
     [36.8,-9.7],
     [42.3,-6]
@@ -142,7 +141,6 @@ function nomeRisco(r){
 function criarConteudoPopup(nomeConcelho, riscoNum){
     const riscoTexto = nomeRisco(riscoNum);
     
-    // Mapeamento exato dos nomes dos ficheiros .svg na pasta images
     const nomesImagens = {
         1: "Reduzido-2022.svg",
         2: "Moderado-2022.svg",
@@ -158,12 +156,11 @@ function criarConteudoPopup(nomeConcelho, riscoNum){
         <div style="padding: 5px;">
             <b style="font-size:16px; display:block;">${nomeConcelho}</b>
             <img src="${caminhoImagem}" alt="${riscoTexto}" class="popup-img">
-            Risco: <b>${riscoTexto}</b>
+            <span style="font-size:14px;"><b>Risco: ${riscoTexto}</b></span>
         </div>
     `;
 }
 
-// animação suave de cor
 function animarCor(layer, novaCor, duracao=500){
     let start = null;
     function step(timestamp){
@@ -176,7 +173,6 @@ function animarCor(layer, novaCor, duracao=500){
     requestAnimationFrame(step);
 }
 
-// piscar concelhos com risco Máximo
 function iniciarPiscar(){
     if(intervalPiscar) clearInterval(intervalPiscar);
     intervalPiscar = setInterval(()=>{
