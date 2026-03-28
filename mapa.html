@@ -3,88 +3,59 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Monitorização de Risco de Incêndio - IPMA vs COPERNICUS</title>
+    <title>Monitorização IPMA - Risco e Meteorologia</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #000; color: white; overflow: hidden; }
-        
-        /* Barra de Topo Recuperada */
         #topbar { background: #1a1a1a; padding: 10px; text-align: center; border-bottom: 2px solid #333; height: 85px; box-sizing: border-box; }
-        #titulo-principal { font-size: 18px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
-        #subtitulo { font-size: 12px; color: #aaa; margin-top: 5px; }
+        #titulo-principal { font-size: 20px; font-weight: bold; color: #ff4400; margin: 0; text-transform: uppercase; }
+        #subtitulo { font-size: 13px; color: #aaa; margin-top: 5px; }
 
-        #map-container { display: flex; height: calc(100vh - 85px); width: 100vw; }
-        .map-box { width: 50%; height: 100%; border-right: 1px solid #333; position: relative; }
+        #mapIPMA { width: 100vw; height: calc(100vh - 85px); background: #050505; }
         
-        .label-map { 
-            position: absolute; top: 10px; left: 50px; z-index: 1000; 
-            background: rgba(0,0,0,0.85); padding: 5px 12px; border-radius: 4px; 
-            font-weight: bold; border: 1px solid #444; font-size: 12px;
-        }
-
         .controles {
-            position: absolute; bottom: 20px; left: 10px; z-index: 1000;
-            background: rgba(0,0,0,0.9); padding: 8px; border-radius: 8px;
-            display: flex; flex-wrap: wrap; gap: 4px; border: 1px solid #444; max-width: 220px;
+            position: absolute; bottom: 30px; left: 20px; z-index: 1000;
+            background: rgba(0,0,0,0.9); padding: 10px; border-radius: 8px;
+            display: flex; gap: 8px; border: 1px solid #444;
         }
         .btn-dia { 
-            background: #333; color: white; border: 1px solid #555; padding: 4px 6px; 
-            cursor: pointer; border-radius: 3px; font-size: 10px; min-width: 35px;
+            background: #333; color: white; border: 1px solid #555; padding: 8px 12px; 
+            cursor: pointer; border-radius: 4px; font-size: 12px; font-weight: bold;
         }
-        .btn-dia.active { background: #ff4400; font-weight: bold; border-color: #fff; }
+        .btn-dia.active { background: #ff4400; border-color: #fff; }
 
-        .legend { background: rgba(255, 255, 255, 0.9); padding: 8px; color: #111; font-size: 10px; border-radius: 5px; font-weight: bold; }
-        .legend i { width: 14px; height: 14px; float: left; margin-right: 6px; border-radius: 2px; }
+        .legend { background: rgba(255, 255, 255, 0.9); padding: 10px; color: #111; font-size: 11px; border-radius: 5px; font-weight: bold; line-height: 1.5; }
+        .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px; }
 
-        #mapIPMA, #mapEFFIS { width: 100%; height: 100%; background: #050505; }
-        .popup-img { width: 85px; height: auto; margin: 8px auto; display: block; border-radius: 4px; }
-        
         /* Estilo do Popup */
-        .leaflet-popup-content { text-align: center; color: #333; line-height: 1.4; }
+        .leaflet-popup-content { text-align: center; color: #333; min-width: 150px; }
+        .popup-img { width: 90px; height: auto; margin: 10px auto; display: block; }
+        .meteo-info { margin-top: 8px; padding-top: 8px; border-top: 1px solid #ccc; font-size: 13px; text-align: left; }
     </style>
 </head>
 <body>
 
 <div id="topbar">
-    <p id="titulo-principal">MONITORIZAÇÃO DE RISCO DE INCÊNDIO: IPMA vs EFFIS</p>
-    <p id="subtitulo">Sincronizado: Arraste um mapa para navegar em ambos</p>
+    <p id="titulo-principal">Monitorização de Risco de Incêndio (IPMA)</p>
+    <p id="subtitulo">Dados oficiais por concelho com informação meteorológica</p>
 </div>
 
-<div id="map-container">
-    <div class="map-box">
-        <div class="label-map" id="label-ipma">IPMA: Hoje (D+0)</div>
-        <div id="mapIPMA"></div>
-        <div class="controles" id="ctrl-ipma">
-            <button class="btn-dia active" onclick="mudarDiaIPMA(0, this)">D0</button>
-            <button class="btn-dia" onclick="mudarDiaIPMA(1, this)">D1</button>
-            <button class="btn-dia" onclick="mudarDiaIPMA(2, this)">D2</button>
-        </div>
-    </div>
+<div id="mapIPMA"></div>
 
-    <div class="map-box">
-        <div class="label-map" id="label-effis">EFFIS: Hoje (D+0)</div>
-        <div id="mapEFFIS"></div>
-        <div class="controles">
-            <button class="btn-dia active" onclick="mudarDiaEFFIS(0, this)">D0</button>
-            <button class="btn-dia" onclick="mudarDiaEFFIS(1, this)">D1</button>
-            <button class="btn-dia" onclick="mudarDiaEFFIS(2, this)">D2</button>
-            <button class="btn-dia" onclick="mudarDiaEFFIS(3, this)">D3</button>
-            <button class="btn-dia" onclick="mudarDiaEFFIS(4, this)">D4</button>
-            <button class="btn-dia" onclick="mudarDiaEFFIS(5, this)">D5</button>
-            <button class="btn-dia" onclick="mudarDiaEFFIS(6, this)">D6</button>
-            <button class="btn-dia" onclick="mudarDiaEFFIS(7, this)">D7</button>
-        </div>
-    </div>
+<div class="controles">
+    <button class="btn-dia active" onclick="mudarDia(0, this)">HOJE</button>
+    <button class="btn-dia" onclick="mudarDia(1, this)">AMANHÃ</button>
+    <button class="btn-dia" onclick="mudarDia(2, this)">P. AMANHÃ</button>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 const limitesPT = [[36.8,-10.5], [42.3,-6]];
-const mapIPMA = L.map('mapIPMA').fitBounds(limitesPT);
-const mapEFFIS = L.map('mapEFFIS', { zoomControl: false }).fitBounds(limitesPT);
+const map = L.map('mapIPMA').fitBounds(limitesPT);
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapIPMA);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapEFFIS);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+}).addTo(map);
 
 const infoRiscoIPMA = {
     1: { nome: "Reduzido", cor: "#00cc00", img: "Reduzido-2022.svg" },
@@ -94,55 +65,32 @@ const infoRiscoIPMA = {
     5: { nome: "Máximo", cor: "#990000", img: "Maximo-2022.svg" }
 };
 
-// --- EFFIS COM PROXY PARA EVITAR BLOQUEIO DE DADOS ---
-function getEffisUrl(dia) {
-    const wmsUrl = `https://fwi-forecast.jrc.ec.europa.eu/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=fwi_max_d${dia}&STYLES=fwi_max_fixed&FORMAT=image/png&TRANSPARENT=TRUE&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox}`;
-    return `https://api.allorigins.win/get?url=${encodeURIComponent(wmsUrl)}`;
-}
-
-// Devido à complexidade do EFFIS, usamos o WMS direto que é mais fiável se o servidor estiver aberto
-let camadaEFFIS = L.tileLayer.wms("https://fwi-forecast.jrc.ec.europa.eu/wms", {
-    layers: 'fwi_max_d0',
-    format: 'image/png',
-    transparent: true,
-    version: '1.3.0',
-    opacity: 0.7,
-    styles: 'fwi_max_fixed'
-}).addTo(mapEFFIS);
-
-function mudarDiaEFFIS(dia, btn) {
-    document.querySelectorAll('#mapEFFIS ~ .controles .btn-dia').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('label-effis').innerText = `EFFIS: Previsão D+${dia}`;
-    mapEFFIS.removeLayer(camadaEFFIS);
-    camadaEFFIS = L.tileLayer.wms("https://fwi-forecast.jrc.ec.europa.eu/wms", {
-        layers: `fwi_max_d${dia}`,
-        format: 'image/png',
-        transparent: true,
-        version: '1.3.0',
-        opacity: 0.7,
-        styles: 'fwi_max_fixed'
-    }).addTo(mapEFFIS);
-}
-
-// --- IPMA ---
 let camadaGeoJSON;
-async function mudarDiaIPMA(dia, btn) {
+
+async function mudarDia(dia, btn) {
     if(btn) {
-        document.querySelectorAll('#ctrl-ipma .btn-dia').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.btn-dia').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
     }
-    document.getElementById('label-ipma').innerText = `IPMA: Previsão D+${dia}`;
-    if (camadaGeoJSON) mapIPMA.removeLayer(camadaGeoJSON);
+    if (camadaGeoJSON) map.removeLayer(camadaGeoJSON);
 
     try {
-        const urlIPMA = `https://api.allorigins.win/get?url=${encodeURIComponent('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d' + dia + '.json')}`;
-        const resp = await fetch(urlIPMA).then(r => r.json());
-        const dados = JSON.parse(resp.contents);
+        // 1. Obter Risco de Incêndio
+        const respRisco = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://api.ipma.pt/open-data/forecast/meteorology/rcm/rcm-d' + dia + '.json')}`).then(r => r.json());
+        const dadosRisco = JSON.parse(respRisco.contents);
+
+        // 2. Obter Meteorologia por Concelho (D0, D1 ou D2)
+        const respMeteo = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/hp-daily-forecast-day' + dia + '.json')}`).then(r => r.json());
+        const dadosMeteo = JSON.parse(respMeteo.contents);
+
+        // 3. Obter GeoJSON
         const geo = await fetch("concelhos-simples.geojson").then(r => r.json());
         
         const riscoPorDico = {};
-        Object.values(dados.local).forEach(c => riscoPorDico[c.dico] = c.data.rcm);
+        Object.values(dadosRisco.local).forEach(c => riscoPorDico[c.dico] = c.data.rcm);
+
+        const meteoPorGlobalId = {};
+        dadosMeteo.data.forEach(m => { meteoPorGlobalId[m.globalIdLocal] = m; });
 
         camadaGeoJSON = L.geoJSON(geo, {
             style: (f) => ({ 
@@ -151,45 +99,51 @@ async function mudarDiaIPMA(dia, btn) {
             }),
             onEachFeature: (f, l) => {
                 const r = riscoPorDico[f.properties.DICO];
+                const m = meteoPorGlobalId[f.properties.GLOBALID]; // Usamos o GlobalID que deve estar no GeoJSON
+
                 if(r) {
                     const info = infoRiscoIPMA[r];
-                    // POPUP CORRIGIDO COM NEGRITO
-                    l.bindPopup(`
+                    let popupContent = `
                         <div style="padding:5px;">
-                            <b style="font-size:15px; display:block;">${f.properties.Concelho}</b>
+                            <b style="font-size:16px; display:block; margin-bottom:5px;">${f.properties.Concelho}</b>
                             <img src="images/${info.img}" class="popup-img">
                             <span style="font-size:14px;"><b>Risco: ${info.nome}</b></span>
-                        </div>
-                    `);
+                    `;
+
+                    // Adicionar dados meteorológicos se existirem para este concelho
+                    if(m) {
+                        popupContent += `
+                            <div class="meteo-info">
+                                🌡️ <b>T. Máxima:</b> ${m.tMax}ºC<br>
+                                🌡️ <b>T. Mínima:</b> ${m.tMin}ºC<br>
+                                💧 <b>Humidade:</b> ${m.precipitaProb}%
+                            </div>
+                        `;
+                    }
+
+                    popupContent += `</div>`;
+                    l.bindPopup(popupContent);
                 }
             }
-        }).addTo(mapIPMA);
-    } catch(e) { console.error("Erro IPMA", e); }
+        }).addTo(map);
+
+    } catch(e) { console.error("Erro ao carregar dados", e); }
 }
 
-// SINCRONIZAÇÃO
-mapIPMA.on('drag zoom', () => mapEFFIS.setView(mapIPMA.getCenter(), mapIPMA.getZoom(), {animate:false}));
-mapEFFIS.on('drag zoom', () => mapIPMA.setView(mapIPMA.getCenter(), mapIPMA.getZoom(), {animate:false}));
-
-// LEGENDAS
-const legIPMA = L.control({position: 'bottomleft'});
-legIPMA.onAdd = () => {
+// LEGENDA
+const legenda = L.control({position: 'bottomright'});
+legenda.onAdd = () => {
     const div = L.DomUtil.create('div', 'legend');
-    div.innerHTML = '<b>Risco IPMA</b><br>';
-    for (let i in infoRiscoIPMA) div.innerHTML += `<i style="background:${infoRiscoIPMA[i].cor}"></i> ${infoRiscoIPMA[i].nome}<br>`;
+    div.innerHTML = '<b>Risco de Incêndio</b><br>';
+    for (let i in infoRiscoIPMA) {
+        div.innerHTML += `<i style="background:${infoRiscoIPMA[i].cor}"></i> ${infoRiscoIPMA[i].nome}<br>`;
+    }
     return div;
 };
-legIPMA.addTo(mapIPMA);
+legenda.addTo(map);
 
-const legEFFIS = L.control({position: 'bottomright'});
-legEFFIS.onAdd = () => {
-    const div = L.DomUtil.create('div', 'legend');
-    div.innerHTML = '<b>FWI EFFIS</b><br><i style="background:#0000ff"></i> Muito Baixo<br><i style="background:#00ff00"></i> Médio<br><i style="background:#ffff00"></i> Alto<br><i style="background:#ff9900"></i> Muito Alto<br><i style="background:#ff0000"></i> Extremo';
-    return div;
-};
-legEFFIS.addTo(mapEFFIS);
-
-mudarDiaIPMA(0);
+// Iniciar
+mudarDia(0);
 </script>
 </body>
 </html>
